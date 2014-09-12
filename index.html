@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script>
+
+function add( a, b ) { return { x: a.x + b.x, y: a.y + b.y }; }
+function sub( a, b ) { return { x: a.x - b.x, y: a.y - b.y }; }
+function mul( a, f ) { return { x: a.x * f, y: a.y * f }; }
+function dot( a, b ) { return a.x * b.x + a.y * b.y; }
+function len2( a ) { return dot(a,a); }
+function assign( a, b ) { a.x = b.x; a.y = b.y; }
+
+function spec45() {
+    // {4,5}, the order-5 square tiling: http://en.wikipedia.org/wiki/Order-5_square_tiling
+    var t = ( 1 - Math.sqrt( 7 - 3*Math.sqrt(5) ) ) / 3;
+    var R = Math.sqrt( 3 - Math.sqrt(5) ) + 0.11; // TODO: make some maths happen
+    var d = Math.sqrt( R*R - t*t ) + t; // make intersect the vertices of the square
+    return {
+        circles:[ { p:{ x:d,  y:0 },  r:R }, { p:{ x:0,  y:-d }, r:R }, 
+                  { p:{ x:0,  y:d },  r:R }, { p:{ x:-d, y:0 },  r:R } ],
+        vertices:[ {x:-t,y:-t}, {x:-t,y:t}, {x:t,y:t}, {x:t,y:-t} ]
+    };
+}
+
+function spec44() {
+    // {4,4}, the square tiling: http://en.wikipedia.org/wiki/Square_tiling
+    // just an approximation, for fun; we're not going to put the circles at infinity
+    var t = 0.08;
+    var R = 100;
+    var d = Math.sqrt( R*R - t*t ) + t; // make intersect the vertices of the square
+    return {
+        circles:[ { p:{ x:d,  y:0 },  r:R }, { p:{ x:0,  y:-d }, r:R }, 
+                  { p:{ x:0,  y:d },  r:R }, { p:{ x:-d, y:0 },  r:R } ],
+        vertices:[ {x:-t,y:-t}, {x:-t,y:t}, {x:t,y:t}, {x:t,y:-t} ]
+    };
+}
+
+function init() {
+    spec = spec45();
+    drawThings();
+}
+
+function circleInversion( p, circle ) {
+    var r2 = circle.r * circle.r;
+    var pq2 = len2( sub( p, circle.p ) );
+    return add( circle.p, mul( sub( p, circle.p ), r2 / pq2 ) );
+}
+
+function getMirrorLists( depth, num_mirrors ) {
+    var lists = [[]];
+    var iList = 0;
+    for( var iDepth = 0; iDepth < depth; ++iDepth ) {
+        var num_lists = lists.length;
+        for( ; iList < num_lists; ++iList ) {
+            for( iExtraMirror = 0; iExtraMirror < num_mirrors; ++iExtraMirror ) {
+                if( iExtraMirror == lists[iList][ lists[iList].length-1 ] ) continue;
+                var extended_list = lists[iList].slice();
+                extended_list.push( iExtraMirror );
+                lists.push( extended_list );
+            }
+        }
+    }
+    return lists;
+}
+
+function drawThings() {
+    var canvas = document.getElementById('canvas');
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    draw_params = { scale:2*canvas.height/3, offset:{ x:canvas.width/2, y:canvas.height/2 } };
+    
+    // draw the circles
+    for( var iMirror in spec.circles ) {
+        var circle = spec.circles[ iMirror ];
+        ctx.beginPath();
+        var center = add( mul( circle.p, draw_params.scale ), draw_params.offset );
+        ctx.arc( center.x, center.y, circle.r * draw_params.scale, 0, 2*Math.PI );
+        ctx.stroke();
+    }
+    // draw the cell, reflected in the mirrors in the order specified
+    var depth = 5;
+    var mirror_lists = getMirrorLists( depth, spec.circles.length );
+    ctx.fillStyle = "rgba(200,210,255,0.3)";
+    ctx.strokeStyle = "rgba(0,0,0,0.3)";
+    for( var iList in mirror_lists ) {
+        var mirror_list = mirror_lists[ iList ];
+        ctx.beginPath();
+        var p0 = {};
+        for( var iVert in spec.vertices ) {
+            var p = { x: spec.vertices[iVert].x, y: spec.vertices[iVert].y };
+            for( var i in mirror_list )
+                assign( p, circleInversion( p, spec.circles[ mirror_list[i] ] ) );
+            var draw_p = add( mul( p, draw_params.scale ), draw_params.offset );
+            if( iVert == 0 ) {
+                ctx.moveTo( draw_p.x, draw_p.y );
+                assign( p0, draw_p );
+            }
+            else {
+                ctx.lineTo( draw_p.x, draw_p.y );
+            }
+        }
+        ctx.lineTo( p0.x, p0.y );
+        ctx.fill();
+        ctx.stroke();
+    }
+}
+
+window.onload = init;
+</script>
+
+<noscript>
+<p>For full functionality of this site it is necessary to enable JavaScript.
+Here are the <a href="http://www.enable-javascript.com/" target="_blank">
+instructions how to enable JavaScript in your web browser</a>.
+</p></noscript>
+
+</head>
+
+<body>
+<p align="center"><canvas id="canvas" width="1000" height="600">(Canvas drawing not supported by your browser.)</canvas></p>
+</body>
+
+</html>
