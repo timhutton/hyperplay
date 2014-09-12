@@ -88,11 +88,14 @@ function init() {
     spec = make_spec( N, 0 );
     drawMesh();
 
-    canvas.addEventListener('mousemove',  onMouseMove, false);
-    canvas.addEventListener('mousedown',  onMouseMove, false);
-    canvas.addEventListener("touchstart", onMouseMove, false);
-    canvas.addEventListener("touchend",   onMouseMove, false);
-    canvas.addEventListener("touchmove",  onMouseMove, false);
+    canvas.addEventListener('mousemove',   onMouseMove, false);
+    canvas.addEventListener('mousedown',   onMouseMove, false);
+    canvas.addEventListener('mouseup',     onMouseMove, false);
+    canvas.addEventListener("touchstart",  onMouseMove, false);
+    canvas.addEventListener("touchend",    onMouseMove, false);
+    canvas.addEventListener("touchmove",   onMouseMove, false);
+    canvas.addEventListener("touchcancel", onMouseMove, false);
+    canvas.addEventListener("touchleave",  onMouseMove, false);
 }
 
 function sphereInversion( p, sphere ) {
