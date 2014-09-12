@@ -12,50 +12,10 @@ function mul( a, f ) { return { x: a.x * f, y: a.y * f, z: a.z * f }; }
 function dot( a, b ) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 function len2( a ) { return dot(a,a); }
 function assign( a, b ) { a.x = b.x; a.y = b.y; a.z = b.z }
+function normalize( a ) { return mul( a, 1 / Math.sqrt( len2( a ) ) ); }
+function cross( a, b ) { return { x: a.y * b.z - a.z * b.y, y: a.z*b.x - a.x * b.z, z: a.x * b.y - a.y * b.x }; }
 
-function spec45() {
-    // {4,5}, the order-5 square tiling: http://en.wikipedia.org/wiki/Order-5_square_tiling
-    var t = ( 1 - Math.sqrt( 7 - 3*Math.sqrt(5) ) ) / 3;
-    var R = Math.sqrt( 3 - Math.sqrt(5) ) + 0.11; // TODO: make some maths happen
-    R /= t;
-    t = 1;
-    var d = Math.sqrt( R*R - t*t ) + t; // make intersect the vertices of the square
-    return {
-        mirrors:[ { type:MirrorType.SPHERE, p:{ x:d,  y:0,  z:0 }, r:R }, 
-                  { type:MirrorType.SPHERE, p:{ x:0,  y:-d, z:0 }, r:R }, 
-                  { type:MirrorType.SPHERE, p:{ x:0,  y:d,  z:0 }, r:R }, 
-                  { type:MirrorType.SPHERE, p:{ x:-d, y:0,  z:0 }, r:R } ],
-        vertices:[ {x:-t,y:-t,z:0}, {x:-t,y:t,z:0}, {x:t,y:t,z:0}, {x:t,y:-t,z:0} ]
-    };
-}
-
-function spec44() {
-    // {4,4}, the square tiling: http://en.wikipedia.org/wiki/Square_tiling
-    var t = 1;
-    var d = t; // make intersect the vertices of the square
-    return {
-        mirrors:[ { type:MirrorType.PLANE, p:{ x:d,  y:0,  z:0 }, n:{ x:1, y:0, z:0 } }, 
-                  { type:MirrorType.PLANE, p:{ x:0,  y:-d, z:0 }, n:{ x:0, y:1, z:0 } }, 
-                  { type:MirrorType.PLANE, p:{ x:0,  y:d,  z:0 }, n:{ x:0, y:1, z:0 } }, 
-                  { type:MirrorType.PLANE, p:{ x:-d, y:0,  z:0 }, n:{ x:1, y:0, z:0 } } ],
-        vertices:[ {x:-t,y:-t,z:0}, {x:-t,y:t,z:0}, {x:t,y:t,z:0}, {x:t,y:-t,z:0} ]
-    };
-}
-
-function spec43() {
-    // {4,3}, the cube
-    var t = 1;
-    var r2 = Math.sqrt(1/2);
-    return {
-        mirrors:[ { type:MirrorType.PLANE, p:{ x:0, y:0, z:t }, n:{ x:r2, y:0, z:r2 } }, 
-                  { type:MirrorType.PLANE, p:{ x:0, y:0, z:t }, n:{ x:0, y:r2, z:r2 } }, 
-                  { type:MirrorType.PLANE, p:{ x:0, y:0, z:t }, n:{ x:0, y:-r2, z:r2 } }, 
-                  { type:MirrorType.PLANE, p:{ x:0, y:0, z:t }, n:{ x:-r2, y:0, z:r2 } } ],
-        vertices:[ {x:-t,y:-t,z:0}, {x:-t,y:t,z:0}, {x:t,y:t,z:0}, {x:t,y:-t,z:0} ]
-    };
-}
-
-function make_spec(p,f) {
+function make_spec( N, f ) {
     // f is the curvature of space.
     // f=0 means flat Euclidean space. plane reflection is a line in 2D
     // f>0 means hyperbolic space, with circle inversion in 2D if we want to render using the Poincare disk model
@@ -63,12 +23,72 @@ function make_spec(p,f) {
     // start with a p-gon in the center (2D but embedded in R3)
     // if f>0 then R=1/f is the radius of the spheres we will use for inversion
     // if f<0 then R=1/-f is the radius of the sphere on which the world lives (determines the angle of the 3d plane we will use to reflect)
-    // TODO
+    var t = 1; // distance from center to vertex of polygon
+    var spec = { mirrors:[], vertices:[] };
+    for( var i = 0; i < N; ++i ) {
+        var theta = ( i + 0.5 ) * 2 * Math.PI / N;
+        spec.vertices.push( { x: t * Math.cos( theta ), y: t * Math.sin( theta ), z:0 } );
+    }
+    if( Math.abs( f ) < 1e-4 ) {
+        // a set of planes, one on each face, with normal lying on the z=0 plane
+        var r = t * Math.cos( Math.PI / N );
+        for( var i = 0; i < N; ++i ) {
+            var theta = i * 2 * Math.PI / N;
+            var p = { x: r * Math.cos( theta ), y: r * Math.sin( theta ), z:0 };
+            var n = normalize( sub( p, {x:0,y:0,z:0} ) );
+            spec.mirrors.push( { type:MirrorType.PLANE, p:p, n:n } );
+        }
+    }
+    else if( f < 0 ) {
+        // a set of planes, passing through an edge and the center of the world sphere
+        R = -1 / f;
+        var c = { x:0, y:0, z:Math.sqrt(R*R-t*t) };
+        for( var i = 0; i < N; ++i ) {
+            var theta1 = ( i + 0.5 ) * 2 * Math.PI / N;
+            var p1 = { x: t * Math.cos( theta1 ), y: t * Math.sin( theta1 ), z:0 };
+            var theta2 = ( i + 1.5 ) * 2 * Math.PI / N;
+            var p2 = { x: t * Math.cos( theta2 ), y: t * Math.sin( theta2 ), z:0 };
+            var n = normalize( cross( sub( p1, c ), sub( p2, c ) ) );
+            spec.mirrors.push( { type:MirrorType.PLANE, p:c, n:n } );
+        }
+    }
+    else {
+        f /= 4; // else the mouse feels a bit faster on this side
+        // a set of spheres with radius R passing through the vertices
+        R = 1 / f;
+        var d = t * Math.cos( Math.PI / N ) + Math.sqrt( R*R - Math.pow( t * Math.sin( Math.PI / N ), 2 ) );
+        for( var i = 0; i < N; ++i ) {
+            var theta = i * 2 * Math.PI / N;
+            var p = { x: d * Math.cos( theta ), y: d * Math.sin( theta ), z:0 };
+            spec.mirrors.push( { type:MirrorType.SPHERE, p:p, r:R } );
+        }
+    }
+    return spec;
+}
+
+function getMousePos(canvas, evt) {
+    var rect = canvas.getBoundingClientRect();
+    return {
+        x: evt.clientX - rect.left,
+        y: evt.clientY - rect.top
+    };
+}
+
+function onMouseMove( evt ) {
+    var pos = getMousePos( canvas, evt );
+    spec = make_spec( N, ( pos.x - canvas.width / 2 ) / ( canvas.width / 3 ) );
+    drawMesh();
 }
 
 function init() {
-    spec = spec45();
-    drawThings();
+    N = 3; // TODO: give user the choice
+    canvas = document.getElementById('canvas');
+    ctx = canvas.getContext('2d');
+
+    spec = make_spec( N, 0 );
+    drawMesh();
+
+    canvas.addEventListener('mousemove',onMouseMove);
 }
 
 function sphereInversion( p, sphere ) {
@@ -109,12 +129,10 @@ function camera_projection( p, camera ) {
              y: cp.y * camera.f / cp.z + camera.pp.y }; // pinhole projection
 }
 
-function drawThings() {
-    var canvas = document.getElementById('canvas');
-    var ctx = canvas.getContext('2d');
+function drawMesh() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    camera = { p:{x:0,y:0,z:-10}, 
+    camera = { p:{x:0,y:0,z:-7},
                x:{x:1,y:0,z:0}, 
                y:{x:0,y:1,z:0}, 
                z:{x:0,y:0,z:1}, 
@@ -127,7 +145,7 @@ function drawThings() {
     // draw the cell, reflected in the mirrors in the order specified
     var depth = 6;
     var mirror_lists = getMirrorLists( depth, spec.mirrors.length );
-    ctx.fillStyle = "rgba(200,210,255,0.3)";
+    ctx.fillStyle = "rgba(200,210,255,0.1)";
     ctx.strokeStyle = "rgba(0,0,0,0.3)";
     for( var iList in mirror_lists ) {
         var mirror_list = mirror_lists[ iList ];
@@ -148,7 +166,6 @@ function drawThings() {
                         break;
                 }
             }
-            console.log(iList,iVert,p);
             var draw_p = camera_projection( p, camera );
             if( iVert == 0 ) {
                 ctx.moveTo( draw_p.x, draw_p.y );
