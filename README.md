@@ -10,3 +10,5 @@ It shows the {3,q} family of tilings, and intermediate forms. When you move the 
 Use the + and - buttons to change the number of sides in the base polygon.
 
 Thanks to Adam P. Goucher for getting me started with hyperbolic tessellation! [Here's a blog post](http://cp4space.wordpress.com/2014/09/12/hyperbolic-minecraft/) he wrote about it.
+
+<img src="http://timhutton.github.io/hyperplay/logo.png" width="400" />
