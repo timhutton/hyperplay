@@ -22,6 +22,8 @@ We repeat this process again and again. We end up with lots of triangles, all jo
 
 At some values of curvature the triangles all overlap neatly and we get a nice *tiling*. This can be a flat tiling like you could use in your bathroom, or it could lie in a curved space like on a ball. A tiled ball is called a polyhedron.
 
+The nice thing about making tilings like this ([Wythoff Construction](https://en.wikipedia.org/wiki/Wythoff_construction)) is that we can do the same thing in negatively curved (hyperbolic) space to get the hyperbolic tilings like {5,4} shown above.
+
 Credits
 -------
 
