@@ -5,7 +5,7 @@ Explore tilings on the hyperbolic plane
 
 [**PLAY HERE!**](http://timhutton.github.io/hyperplay/)
 
-It shows the {3,q} family of tilings, and intermediate forms. When you move the mouse left and right the construction process (reflection in the edges of the base polygon) stays the same but the curvature of the space itself changes. Positive curvature gives us hyperbolic tilings. Negative curvature gives us polyhedra. Zero curvature gives us plane tiling.
+To start with it shows the {3,q} family of tilings, and intermediate forms. When you move the mouse left and right the construction process (reflection in the edges of the base polygon) stays the same but the curvature of the space itself changes. Positive curvature gives us hyperbolic tilings. Negative curvature gives us polyhedra. Zero curvature gives us plane tiling.
 
 Use the + and - buttons to change the number of sides in the base polygon.
 
