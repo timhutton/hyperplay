@@ -20,7 +20,7 @@ First we reflect the triangle in each of those mirrors. Our triangle has now got
 
 We repeat this process again and again. We end up with lots of triangles, all joined edge to edge.
 
-At some values of curvature the triangles all overlap neatly and we get a nice *tiling*. This can be a flat tiling like you could use in your bathroom, or it could lie in a curved space like on a ball. A tiled ball is called a polyhedron.
+At some values of curvature the triangles all overlap neatly and we get a nice *tiling*. This can be a flat tiling like you could use in your bathroom, or it could lie in a curved space like on a ball. A tiled ball is a polyhedron of course.
 
 One nice thing about making tilings like this ([Wythoff Construction](https://en.wikipedia.org/wiki/Wythoff_construction)) is that we can do the same thing in negatively curved ([hyperbolic](https://en.wikipedia.org/wiki/Hyperbolic_space)) space to get the hyperbolic tilings like [{5,4}](https://en.wikipedia.org/wiki/Order-4_pentagonal_tiling) shown above. We render these with the [Poincare disk model](https://en.wikipedia.org/wiki/Poincar%C3%A9_disk_model) which is why the pentagons get small and stretched towards the outside.
 
