@@ -101,12 +101,23 @@ function onMouseDown( evt ) {
 }
 
 function init() {
-    N = 3;
+    N = 5;
     canvas = document.getElementById('canvas');
     ctx = canvas.getContext('2d');
 
     spec = make_spec( N, 0 );
     
+    camera = { p:{x:0,y:3,z:-6},
+               x:{x:1,y:0,z:0}, 
+               y:{x:0,y:1,z:0}, 
+               z:{x:0,y:0,z:1}, 
+               f:canvas.height,
+               pp:{x:canvas.width/2,y:canvas.height/2} };
+    var look_at = {x:0,y:0,z:0};
+    camera.z = normalize( sub( look_at, camera.p ) );
+    camera.x = normalize( cross( camera.z, {x:0,y:1,z:0} ) );
+    camera.y = normalize( cross( camera.x, camera.z ) );
+
     redraw( N, 0 );
 
     canvas.addEventListener( 'mousemove',   onMouseMove, false );
@@ -158,13 +169,6 @@ function drawMesh() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.strokeRect(0, 0, canvas.width, canvas.height);
     
-    camera = { p:{x:0,y:0,z:-7},
-               x:{x:1,y:0,z:0}, 
-               y:{x:0,y:1,z:0}, 
-               z:{x:0,y:0,z:1}, 
-               f:canvas.height,
-               pp:{x:canvas.width/2,y:canvas.height/2} };
-
     // draw the mirrors
     // TODO (bit trickier in 3D)
     
