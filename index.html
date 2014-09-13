@@ -18,11 +18,11 @@ function cross( a, b ) { return { x: a.y * b.z - a.z * b.y, y: a.z*b.x - a.x * b
 function make_spec( N, f ) {
     // f is the curvature of space.
     // f=0 means flat Euclidean space. plane reflection is a line in 2D
-    // f>0 means hyperbolic space, with circle inversion in 2D if we want to render using the Poincare disk model
-    // f<0 means spherical space, where a straight line is a great circle, hence a reflection is an out-of-plane reflection
+    // f<0 means hyperbolic space, with circle inversion in 2D (we render using the Poincare disk model)
+    // f>0 means spherical space, where a straight line is a great circle, hence a reflection is an out-of-plane reflection
     // start with a p-gon in the center (2D but embedded in R3)
-    // if f>0 then R=1/f is the radius of the spheres we will use for inversion
-    // if f<0 then R=1/-f is the radius of the sphere on which the world lives (determines the angle of the 3d plane we will use to reflect)
+    // if f<0 then R=-1/f is the radius of the spheres we will use for inversion
+    // if f>0 then R=1/f is the radius of the sphere on which the world lives (determines the angle of the 3d plane we will use to reflect)
     var t = 1; // distance from center to vertex of polygon
     var spec = { mirrors:[], vertices:[] };
     for( var i = 0; i < N; ++i ) {
@@ -39,9 +39,9 @@ function make_spec( N, f ) {
             spec.mirrors.push( { type:MirrorType.PLANE, p:p, n:n } );
         }
     }
-    else if( f < 0 ) {
+    else if( f > 0 ) {
         // a set of planes, passing through an edge and the center of the world sphere
-        R = -1 / f;
+        R = 1 / f;
         var c = { x:0, y:0, z:Math.sqrt(R*R-t*t) };
         for( var i = 0; i < N; ++i ) {
             var theta1 = ( i + 0.5 ) * 2 * Math.PI / N;
@@ -54,7 +54,7 @@ function make_spec( N, f ) {
     }
     else {
         // a set of spheres with radius R passing through the vertices
-        R = 1 / f;
+        R = -1 / f;
         var d = t * Math.cos( Math.PI / N ) + Math.sqrt( R*R - Math.pow( t * Math.sin( Math.PI / N ), 2 ) );
         for( var i = 0; i < N; ++i ) {
             var theta = i * 2 * Math.PI / N;
@@ -75,16 +75,16 @@ function getMousePos(canvas, evt) {
     };
 }
 
-function redraw() {
+function redraw( N, f ) {
     drawMesh();
-    drawUI();
+    drawUI( N, f );
 }
 
 function onMouseMove( evt ) {
     var pos = getMousePos( canvas, evt );
     var f = ( pos.x - canvas.width / 2 ) / ( canvas.width / 3 );
     spec = make_spec( N, f );
-    redraw();
+    redraw( N, f );
 }
 
 function onMouseDown( evt ) {
@@ -107,7 +107,7 @@ function init() {
 
     spec = make_spec( N, 0 );
     
-    redraw();
+    redraw( N, 0 );
 
     canvas.addEventListener( 'mousemove',   onMouseMove, false );
     canvas.addEventListener( "touchmove",   onMouseMove, false );
@@ -205,7 +205,7 @@ function drawMesh() {
     }
 }
 
-function drawUI() {
+function drawUI( N, f ) {
     rect_minus = { x: 10, y:10, width:20, height:20 };
     rect_plus = { x: 50, y:10, width:20, height:20 };
     ctx.fillStyle="rgb(255,255,255)";
@@ -220,6 +220,16 @@ function drawUI() {
     ctx.textBaseline = "middle";
     ctx.fillText("-",rect_minus.x+rect_minus.width/2,rect_minus.y + rect_minus.height/2 );
     ctx.fillText("+",rect_plus.x+rect_plus.width/2,rect_plus.y + rect_plus.height/2 );
+    ctx.font="14px Arial";
+    ctx.fillStyle="rgba(0,0,0,0.4)";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("{"+N+",q}",10, rect_minus.y+rect_minus.height + 10 );
+    ctx.font="14px Arial";
+    ctx.fillStyle="rgba(0,0,0,0.4)";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.fillText("Curvature: "+f.toFixed(2),20,canvas.height-20);
 }
 
 window.onload = init;
