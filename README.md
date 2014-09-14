@@ -5,11 +5,11 @@ hyperplay
 
 [**PLAY HERE!**](http://timhutton.github.io/hyperplay/)
 
-<a href="http://timhutton.github.io/hyperplay/"><img src="http://timhutton.github.io/hyperplay/logo.png" width="300" /></a>
-
 To start with it shows the [{3,q}](https://en.wikipedia.org/wiki/Triangular_tiling#Related_polyhedra_and_tilings) family of tilings, and intermediate forms. When you move the mouse left and right the construction process (reflection in the edges of the base polygon) stays the same but the curvature of the space itself changes. Negative curvature gives us hyperbolic tilings. Zero curvature gives us plane tiling. Positive curvature gives us polyhedra. 
 
 Use the ```+``` and ```-``` buttons to change the number of sides in the base polygon.
+
+<a href="http://timhutton.github.io/hyperplay/"><img src="http://timhutton.github.io/hyperplay/logo.png" width="300" /></a>
 
 What the heck am I looking at?
 ------------------------------
