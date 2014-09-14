@@ -15,7 +15,11 @@ function assign( a, b ) { a.x = b.x; a.y = b.y; a.z = b.z }
 function normalize( a ) { return mul( a, 1 / Math.sqrt( len2( a ) ) ); }
 function cross( a, b ) { return { x: a.y * b.z - a.z * b.y, y: a.z*b.x - a.x * b.z, z: a.x * b.y - a.y * b.x }; }
 
-function make_spec( N, f ) {
+var N;
+var f;
+var theta;
+
+function make_spec() {
     // f is the curvature of space.
     // f=0 means flat Euclidean space. plane reflection is a line in 2D
     // f<0 means hyperbolic space, with circle inversion in 2D (we render using the Poincare disk model)
@@ -75,16 +79,26 @@ function getMousePos(canvas, evt) {
     };
 }
 
-function redraw( N, f ) {
+function redraw() {
     drawMesh();
-    drawUI( N, f );
+    drawUI();
 }
 
 function onMouseMove( evt ) {
     var pos = getMousePos( canvas, evt );
-    var f = ( pos.x - canvas.width / 2 ) / ( canvas.width / 3 );
-    spec = make_spec( N, f );
-    redraw( N, f );
+    f = ( pos.x - canvas.width / 2 ) / ( canvas.width / 3 );
+    spec = make_spec();
+    redraw();
+}
+
+function repositionCamera() {
+    var look_at = {x:0,y:0,z:0};
+    var d = 6;
+    camera.p = { x:d*Math.cos(theta),y:-1,z:d*Math.sin(theta) };
+    camera.z = normalize( sub( look_at, camera.p ) );
+    camera.x = normalize( cross( camera.z, {x:0,y:1,z:0} ) );
+    camera.y = normalize( cross( camera.x, camera.z ) );
+
 }
 
 function onMouseDown( evt ) {
@@ -102,23 +116,21 @@ function onMouseDown( evt ) {
 
 function init() {
     N = 3;
+    f = 0;
     canvas = document.getElementById('canvas');
     ctx = canvas.getContext('2d');
 
-    spec = make_spec( N, 0 );
-    
+    spec = make_spec();
+
+    theta = 0;
     camera = { p:{x:0,y:3,z:-6},
                x:{x:1,y:0,z:0}, 
                y:{x:0,y:1,z:0}, 
                z:{x:0,y:0,z:1}, 
                f:canvas.height,
                pp:{x:canvas.width/2,y:canvas.height/2} };
-    var look_at = {x:0,y:0,z:0};
-    camera.z = normalize( sub( look_at, camera.p ) );
-    camera.x = normalize( cross( camera.z, {x:0,y:1,z:0} ) );
-    camera.y = normalize( cross( camera.x, camera.z ) );
-
-    redraw( N, 0 );
+    repositionCamera();
+    redraw();
 
     canvas.addEventListener( 'mousemove',   onMouseMove, false );
     canvas.addEventListener( "touchmove",   onMouseMove, false );
@@ -168,7 +180,7 @@ function camera_projection( p, camera ) {
 function drawMesh() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.strokeRect(0, 0, canvas.width, canvas.height);
-    
+
     // draw the mirrors
     // TODO (bit trickier in 3D)
     
@@ -209,7 +221,7 @@ function drawMesh() {
     }
 }
 
-function drawUI( N, f ) {
+function drawUI() {
     rect_minus = { x: 10, y:10, width:20, height:20 };
     rect_plus = { x: 50, y:10, width:20, height:20 };
     ctx.fillStyle="rgb(255,255,255)";
@@ -233,10 +245,18 @@ function drawUI( N, f ) {
     ctx.fillStyle="rgba(0,0,0,0.4)";
     ctx.textAlign = "left";
     ctx.textBaseline = "bottom";
-    ctx.fillText("Curvature: "+f.toFixed(2),20,canvas.height-20);
+    ctx.fillText("Curvature: "+f.toFixed(3),20,canvas.height-20);
+}
+
+function animate() {
+    // rotate round
+    theta += 0.01;
+    repositionCamera();
+    redraw();
 }
 
 window.onload = init;
+setInterval( animate, 20 );
 </script>
 
 <noscript>
@@ -249,6 +269,10 @@ instructions how to enable JavaScript in your web browser</a>.
 
 <body>
 <p align="center"><canvas id="canvas" width="1000" height="600">(Canvas drawing not supported by your browser.)</canvas></p>
+
+<h4>Controls:</h4>
+<p>Move mouse left and right to alter the curvature.</p>
+<p>Use the '+' and '-' buttons to change the base polygon.</p>
 </body>
 
 </html>
