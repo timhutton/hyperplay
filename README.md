@@ -5,8 +5,8 @@ hyperplay
 
 [**PLAY HERE!**](http://timhutton.github.io/hyperplay/)
 
-Usage
------
+Usage:
+------
 
 To start with it shows the [{3,q}](https://en.wikipedia.org/wiki/Triangular_tiling#Related_polyhedra_and_tilings) family of tilings, and intermediate forms. 
 
@@ -19,7 +19,7 @@ Use the ```+``` and ```-``` buttons to change the number of sides in the base po
 What the heck am I looking at?
 ------------------------------
 
-Notice that there's a triangle in the center that never moves. We will use the edges of this triangle as mirrors. 
+Notice that there's a triangle in the center that never changes. We will use the edges of this triangle as mirrors. 
 
 First we reflect the triangle in each of those mirrors. Our triangle has now got three more triangles around it, one fixed to each edge.
 
@@ -29,9 +29,16 @@ At some values of curvature the triangles all overlap neatly and we get a nice *
 
 One nice thing about making tilings like this ([Wythoff Construction](https://en.wikipedia.org/wiki/Wythoff_construction)) is that we can do the same thing in negatively curved ([hyperbolic](https://en.wikipedia.org/wiki/Hyperbolic_space)) space to get the hyperbolic tilings like [{5,4}](https://en.wikipedia.org/wiki/Order-4_pentagonal_tiling) shown above. We render these with the [Poincare disk model](https://en.wikipedia.org/wiki/Poincar%C3%A9_disk_model) which is why the pentagons get small and stretched towards the outside.
 
-Credits
--------
+Credits:
+--------
 
 Thanks to Adam P. Goucher for getting me started with hyperbolic tessellation! [Here's a blog post](http://cp4space.wordpress.com/2014/09/12/hyperbolic-minecraft/) he wrote about it.
 
 He made his own interactive demonstration of Wythoff Construction, [here](http://demonstrations.wolfram.com/WythoffConstructionOfPolyhedra/).
+
+Discussions:
+------------
+
+[Comments](https://plus.google.com/110214848059767137292/posts/fXR8AChDbSY) on the original Google+ post.
+
+
