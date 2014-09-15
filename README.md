@@ -39,7 +39,8 @@ He made his own interactive demonstration of Wythoff Construction, [here](http:/
 Discussions:
 ------------
 
-[Comments](https://plus.google.com/110214848059767137292/posts/fXR8AChDbSY) on the original Google+ post.
-[The Aperiodical](http://aperiodical.com/2014/09/have-fun-playing-with-curvature/)
-[Hacker News](https://news.ycombinator.com/item?id=8317895)
+* [Comments](https://plus.google.com/110214848059767137292/posts/fXR8AChDbSY) on the original Google+ post.
+* [The Aperiodical](http://aperiodical.com/2014/09/have-fun-playing-with-curvature/)
+* [Hacker News](https://news.ycombinator.com/item?id=8317895)
+
 
