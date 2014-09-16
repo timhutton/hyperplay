@@ -41,10 +41,8 @@ function make_spec() {
     if( Math.abs( f ) < 1e-4 ) {
         // flat space
         // a set of planes, one on each face, with normal lying on the z=0 plane
-        var r = t * Math.cos( Math.PI / N );
         for( var i = 0; i < N; ++i ) {
-            var theta = i * 2 * Math.PI / N;
-            var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
+            var p = mul( add( spec.vertices[ i ], spec.vertices[ (i+1)%N ] ), 0.5 );
             var n = normalize( p );
             spec.mirrors.push( { type:MirrorType.PLANE, p:p, n:n } );
         }
@@ -73,6 +71,13 @@ function make_spec() {
     spec.depth = Math.max( 2, Math.min( 6, 8 - N ) );
 }
 
+function changeNumberOfSides( newN ) {
+    N = newN;
+    make_spec();
+    makeMirrorLists();
+    redraw();
+}
+
 function getMousePos(canvas, evt) {
     var rect = canvas.getBoundingClientRect();
     return p2( evt.clientX - rect.left, evt.clientY - rect.top );
@@ -99,17 +104,11 @@ function onMouseDown( evt ) {
     var pos = getMousePos( canvas, evt );
     if( N > 3 && pos.x > rect_minus.x && pos.x < (rect_minus.x + rect_minus.width) &&
         pos.y > rect_minus.y && pos.y < (rect_minus.y + rect_minus.height) ) {
-        --N;
-        make_spec();
-        makeMirrorLists();
-        redraw();
+        changeNumberOfSides( N-1 );
     }
     else if( N < 9 && pos.x > rect_plus.x && pos.x < (rect_plus.x + rect_plus.width) &&
         pos.y > rect_plus.y && pos.y < (rect_plus.y + rect_plus.height) ) {
-        ++N;
-        make_spec();
-        makeMirrorLists();
-        redraw();
+        changeNumberOfSides( N+1 );
     }
 }
 
