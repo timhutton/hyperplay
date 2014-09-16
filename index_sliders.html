@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script>
+
+var MirrorType = { SPHERE:1, PLANE:2 };
+
+function add( a, b ) { return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }; }
+function sub( a, b ) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
+function mul( a, f ) { return { x: a.x * f, y: a.y * f, z: a.z * f }; }
+function dot( a, b ) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+function len2( a ) { return dot(a,a); }
+function assign( a, b ) { a.x = b.x; a.y = b.y; a.z = b.z }
+function normalize( a ) { return mul( a, 1 / Math.sqrt( len2( a ) ) ); }
+function cross( a, b ) { return { x: a.y * b.z - a.z * b.y, y: a.z*b.x - a.x * b.z, z: a.x * b.y - a.y * b.x }; }
+function p3( x, y, z ) { return { x:x, y:y, z:z }; }
+function p2( x, y ) { return { x:x, y:y }; }
+
+var N;
+var theta;
+var spec;
+var camera;
+var mirror_lists;
+var sliders;
+var iActiveSlider;
+
+function curvatureFromSliderPos( v ) { return ( v - 0.5 ) * 3; }
+
+function make_spec() {
+    var f = curvatureFromSliderPos( sliders[1].value );
+    // f is the curvature of space.
+    // f=0 means flat Euclidean space. plane reflection is a line in 2D
+    // f<0 means hyperbolic space, with circle inversion in 2D (we render using the Poincare disk model)
+    // f>0 means spherical space, where a straight line is a great circle, hence a reflection is an out-of-plane reflection
+    // start with a N-gon in the center (2D but embedded in R3)
+    // if f<0 then R=-1/f is the radius of the spheres we will use for inversion
+    // if f>0 then R=1/f is the radius of the sphere on which the world lives (determines the angle of the 3d plane we will use to reflect)
+    var t = 1; // distance from face center to vertex of polygon
+    spec = { mirrors:[], vertices:[] };
+    for( var i = 0; i < N; ++i ) {
+        var theta = ( i + 0.5 ) * 2 * Math.PI / N;
+        spec.vertices.push( p3( t * Math.cos( theta ), t * Math.sin( theta ), 0 ) );
+    }
+    if( Math.abs( f ) < 1e-4 ) {
+        // flat space
+        // a set of planes, one for each edge, with normal lying on the z=0 plane
+        for( var i = 0; i < N; ++i ) {
+            var p = mul( add( spec.vertices[ i ], spec.vertices[ (i+1)%N ] ), 0.5 );
+            var n = normalize( p );
+            spec.mirrors.push( { type:MirrorType.PLANE, p:p, n:n } );
+        }
+    }
+    else if( f > 0 ) {
+        // spherical space
+        // a set of planes, passing through an edge and the center of the world sphere
+        R = 1 / f;
+        var c = p3( 0, 0, Math.sqrt( R * R - t * t ) );
+        for( var i = 0; i < N; ++i ) {
+            var n = normalize( cross( sub( spec.vertices[ i ], c ), sub( spec.vertices[ (i+1)%N ], c ) ) );
+            spec.mirrors.push( { type:MirrorType.PLANE, p:c, n:n } );
+        }
+    }
+    else {
+        // hyperbolic space
+        // a set of inversion spheres, each with radius R passing through two neighboring vertices
+        R = -1 / f;
+        var d = t * Math.cos( Math.PI / N ) + Math.sqrt( R*R - Math.pow( t * Math.sin( Math.PI / N ), 2 ) );
+        for( var i = 0; i < N; ++i ) {
+            var theta = i * 2 * Math.PI / N;
+            var p = p3( d * Math.cos( theta ), d * Math.sin( theta ), 0 );
+            spec.mirrors.push( { type:MirrorType.SPHERE, p:p, r:R } );
+        }
+    }
+    spec.depth = Math.max( 2, Math.min( 6, 8 - N ) );
+}
+
+function changeNumberOfSides( newN ) {
+    N = newN;
+    make_spec();
+    makeMirrorLists();
+    redraw();
+}
+
+function getMousePos(canvas, evt) {
+    var rect = canvas.getBoundingClientRect();
+    return p2( evt.clientX - rect.left, evt.clientY - rect.top );
+}
+
+function onMouseMove( evt ) {
+    var pos = getMousePos( canvas, evt );
+    if( iActiveSlider >= 0 ) {
+        var slider = sliders[ iActiveSlider ];
+        slider.value = Math.min( 1, Math.max( 0, ( pos.x - slider.x ) / slider.width ) );
+        make_spec();
+        redraw();
+    }
+}
+
+function onMouseDown( evt ) {
+    var pos = getMousePos( canvas, evt );
+    for( var iSlider in sliders ) {
+        if( pointInRect( pos, sliders[ iSlider ].handle_rect ) ) {
+            iActiveSlider = iSlider;
+            break;
+        }
+    }
+}
+
+function onMouseUp( evt ) {
+    iActiveSlider = -1;
+}
+
+function repositionCamera() {
+    var look_at = p3(0,0,0);
+    var d = 6;
+    camera.p = p3( d*Math.cos(theta), -1, d*Math.sin(theta) );
+    camera.z = normalize( sub( look_at, camera.p ) );
+    camera.x = normalize( cross( camera.z, p3(0,1,0) ) );
+    camera.y = normalize( cross( camera.x, camera.z ) );
+}
+
+function pointInRect( p, rect ) {
+    return p.x > rect.x && p.x < ( rect.x + rect.width ) &&
+           p.y > rect.y && p.y < ( rect.y + rect.height );
+}
+
+function init() {
+    N = 3;
+    canvas = document.getElementById('canvas');
+    ctx = canvas.getContext('2d');
+
+    sliders = [];
+    sliders[0] = { x: 10, y:10, width:canvas.width-20, height:20, value:0, handle_rect:{} };
+    sliders[1] = { x: 10, y:40, width:canvas.width-20, height:20, value:0.5, handle_rect:{} };
+    sliders[2] = { x: 10, y:70, width:canvas.width-20, height:20, value:0, handle_rect:{} };
+    isActiveSlider = -1;
+    
+    theta = Math.PI / 2;
+    camera = { p:p3(0,3,-6),
+               x:p3(1,0,0), 
+               y:p3(0,1,0), 
+               z:p3(0,0,1), 
+               f:canvas.height,
+               pp:p2(canvas.width/2,canvas.height/2) 
+             };
+    repositionCamera();
+    
+    make_spec();
+    makeMirrorLists();
+
+    redraw();
+
+    canvas.addEventListener( 'mousemove', onMouseMove, false );
+    canvas.addEventListener( 'touchmove', onMouseMove, false );
+    canvas.addEventListener( 'touchstart', onMouseDown, false );
+    canvas.addEventListener( 'mousedown',  onMouseDown, false );
+    canvas.addEventListener( 'touchend', onMouseUp, false );
+    canvas.addEventListener( 'mouseup',  onMouseUp, false );
+
+    setInterval( animate, 20 );
+}
+
+function sphereInversion( p, sphere ) {
+    var r2 = sphere.r * sphere.r;
+    var d2 = len2( sub( p, sphere.p ) );
+    return add( sphere.p, mul( sub( p, sphere.p ), r2 / d2 ) );
+}
+
+function planeReflection( p, plane ) {
+    var pn = dot( plane.n, sub( p, plane.p ) );
+    var proj = sub( p, mul( plane.n, pn ) );
+    return add( proj, sub( proj, p ) );
+}
+
+function makeMirrorLists() {
+    mirror_lists = [[]];
+    var iList = 0;
+    for( var iDepth = 0; iDepth < spec.depth; ++iDepth ) {
+        var num_lists = mirror_lists.length;
+        for( ; iList < num_lists; ++iList ) {
+            for( iExtraMirror = 0; iExtraMirror < N; ++iExtraMirror ) {
+                if( iExtraMirror == mirror_lists[iList][ mirror_lists[iList].length-1 ] ) continue;
+                var extended_list = mirror_lists[iList].slice();
+                extended_list.push( iExtraMirror );
+                mirror_lists.push( extended_list );
+            }
+        }
+    }
+}
+
+function camera_projection( p, camera ) {
+    var ray = sub( p, camera.p ); // the ray from camera center to point
+    var cp = p3( dot( camera.x, ray ), dot( camera.y, ray ), dot( camera.z, ray ) ); // into camera space
+    return p2( cp.x * camera.f / cp.z + camera.pp.x, 
+               cp.y * camera.f / cp.z + camera.pp.y ); // pinhole projection
+}
+
+function redraw() {
+    drawMesh();
+    drawUI();
+}
+
+function drawMesh() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+    // draw the cell, reflected in the mirrors in the order specified
+    ctx.fillStyle = "rgba(200,210,255,0.1)";
+    ctx.strokeStyle = "rgba(0,0,0,0.3)";
+    for( var iList in mirror_lists ) {
+        var mirror_list = mirror_lists[ iList ];
+        ctx.beginPath();
+        var p0 = {};
+        var p = {};
+        for( var iVert in spec.vertices ) {
+            assign( p, spec.vertices[iVert] );
+            for( var i in mirror_list )
+            {
+                var mirror = spec.mirrors[ mirror_list[i] ];
+                switch( mirror.type ) {
+                    case MirrorType.SPHERE:
+                        assign( p, sphereInversion( p, mirror ) );
+                        break;
+                    case MirrorType.PLANE:
+                        assign( p, planeReflection( p, mirror ) );
+                        break;
+                }
+            }
+            var draw_p = camera_projection( p, camera );
+            if( iVert == 0 ) {
+                ctx.moveTo( draw_p.x, draw_p.y );
+                assign( p0, draw_p );
+            }
+            else {
+                ctx.lineTo( draw_p.x, draw_p.y );
+            }
+        }
+        ctx.lineTo( p0.x, p0.y );
+        ctx.fill();
+        ctx.stroke();
+    }
+}
+
+function drawRect( x, y, w, h ) {
+    ctx.beginPath();
+    ctx.rect( x, y, w, h );
+    ctx.fill();
+    ctx.stroke();
+}
+
+function drawUI() {
+    // draw the sliders
+    ctx.strokeStyle="rgb(0,0,0)";
+    for( var iSlider = 0; iSlider < sliders.length; ++iSlider ) {
+        var slider = sliders[ iSlider ];
+        ctx.fillStyle="rgb(255,255,255)";
+        drawRect( slider.x, slider.y + slider.height/3, slider.width, slider.height/3 ); // rail
+        if( iActiveSlider == iSlider )
+            ctx.fillStyle="rgb(100,100,255)";
+        var handle_radius = 5;
+        slider.handle_rect = { x:slider.x+slider.width*slider.value-handle_radius, y:slider.y, width:handle_radius*2+1, height:slider.height };
+        drawRect( slider.handle_rect.x, slider.handle_rect.y, slider.handle_rect.width, slider.handle_rect.height );
+    }
+    // draw the curvature text
+    ctx.font="14px Arial";
+    ctx.fillStyle="rgba(0,0,0,0.4)";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.fillText("Curvature: "+curvatureFromSliderPos( sliders[0].value ).toFixed(3)+", "
+                              +curvatureFromSliderPos( sliders[1].value ).toFixed(3)+", "
+                              +curvatureFromSliderPos( sliders[2].value ).toFixed(3)+", ",20,canvas.height-20);
+}
+
+function animate() {
+    // rotate round
+    theta += 0.01;
+    repositionCamera();
+    redraw();
+}
+
+window.onload = init;
+</script>
+
+<noscript>
+<p>For full functionality of this site it is necessary to enable JavaScript.
+Here are the <a href="http://www.enable-javascript.com/" target="_blank">
+instructions how to enable JavaScript in your web browser</a>.
+</p></noscript>
+
+</head>
+
+<body>
+<p align="center"><canvas id="canvas" width="1000" height="600">(Canvas drawing not supported by your browser.)</canvas></p>
+
+</html>
+
