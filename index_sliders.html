@@ -18,13 +18,16 @@ function p3( x, y, z ) { return { x:x, y:y, z:z }; }
 function p2( x, y ) { return { x:x, y:y }; }
 
 var depth;
+var mirror_lists;
 var mesh;
 var theta;
 var camera;
 var sliders;
 var iActiveSlider;
+var curvatureRange = 10;
 
-function curvatureFromSliderPos( v ) { return ( v - 0.5 ) * 10; } // map [0,1] onto [-c,c] curvature
+function curvatureFromSliderPos( v ) { return ( v - 0.5 ) * curvatureRange; }
+function sliderPosFromCurvature( f ) { return f / curvatureRange + 0.5; }
 
 function getMirrorLists( N, d ) {
     // returns e.g (N=3,d=2) [ [], [0], [1], [2], [0,1], [0,2], [1,0], [1,2], [2,0], [2,1] ]
@@ -32,16 +35,13 @@ function getMirrorLists( N, d ) {
     var mirror_lists = [[]];
     var iList = 0;
     for( var iDepth = 0; iDepth < d; ++iDepth ) {
-        console.log( 'iDepth: ', iDepth );
         var num_lists = mirror_lists.length;
         for( ; iList < num_lists; ++iList ) {
             for( iExtraMirror = 0; iExtraMirror < N; ++iExtraMirror ) {
-                console.log( 'iExtraMirror: ', iExtraMirror );
                 if( iExtraMirror == mirror_lists[iList][ mirror_lists[iList].length-1 ] ) continue;
                 var extended_list = mirror_lists[iList].slice();
                 extended_list.push( iExtraMirror );
                 mirror_lists.push( extended_list );
-                console.log( 'extended_list: ', extended_list );
             }
         }
     }
@@ -124,15 +124,12 @@ function makeMesh() {
     var edge_length = 1;
     var edge = [ p3(-edge_length/2,0,0), p3(edge_length/2,0,0) ];
     
-    // work in progress!
-    
-    // make a 1D mirror from each endpoint of the line segment
+    // make a mirror from each endpoint of the line segment
     var mirrors1D = [];
-    for( var iVert in edge ) {
+    for( var iVert in edge )
         mirrors1D.push( makeMirror1D( edge[ iVert ], f1 ) );
-    }
     
-    // make the 1D mesh using the line segment and the mirrors, up to a certain depth
+    // make a polygon using the line segment and the mirrors, up to a certain depth
     // this case is a little different to the next ones, because we need a specific order to draw the edges
     // e.g. depth=3: m0(m1(m0(p1))), m0(m1(p0)), m0(p1), p0, p1, m1(p0), m1(m0(p1)), m1(m0(m1(p0)))
     var polygon = edge.slice();
@@ -150,18 +147,16 @@ function makeMesh() {
     }
 
     // make a 2D mirror from each edge of the polygon
+    var polygon_center = mirrors1D[ 0 ].p; // (all the mirrors have the same center for f1 > 0)
     var mirrors2D = [];
-    var polygon_center = mirrors1D[ 0 ].p; // (all the 1D mirrors have the same center)
-    for( var iVert = 1; iVert < polygon.length; ++iVert ) {
+    for( var iVert = 1; iVert < polygon.length; ++iVert )
         mirrors2D.push( makeMirror2D( polygon[ iVert-1 ], polygon[ iVert ], polygon_center, f2 ) );
-    }
     
     // make a 2D mesh using the polygon and the mirrors, up to a certain depth
-    var polyhedron = [ polygon ];
-    var mirror_lists = getMirrorLists( mirrors2D.length, depth );
+    var polyhedron = [];
     for( var iList in mirror_lists ) {
         var mirror_list = mirror_lists[ iList ];
-        // reflect the polygon of polygon in this sequence of lists
+        // reflect the polygon in this sequence of mirrors
         var new_polygon = [];
         for( var iVert in polygon ) {
             var p = {};
@@ -173,44 +168,11 @@ function makeMesh() {
         polyhedron.push( new_polygon );
     }
     
-    //if( f2 <= 0 ) 
+    //if( f2 <= 0 ) (for now we only have two sliders)
     {
         mesh = [ polyhedron ]; // stop at level 2 (a single polyhedron)
         return;
     }
-    
-    /*
-    // make the 2D mirrors
-    if( Math.abs( f2 ) < 1e-4 ) {
-        // flat space
-        // a set of planes, one for each edge, with normal lying on the z=0 plane
-        for( var i = 0; i < N; ++i ) {
-            var p = mul( add( spec.vertices[ i ], spec.vertices[ (i+1)%N ] ), 0.5 );
-            var n = normalize( p );
-            spec.mirrors2D.push( { type:MirrorType.PLANE, p:p, n:n } );
-        }
-    }
-    else if( f > 0 ) {
-        // spherical space
-        // a set of planes, passing through an edge and the center of the world sphere
-        R = 1 / f;
-        var c = p3( 0, 0, Math.sqrt( R * R - t * t ) );
-        for( var i = 0; i < N; ++i ) {
-            var n = normalize( cross( sub( spec.vertices[ i ], c ), sub( spec.vertices[ (i+1)%N ], c ) ) );
-            spec.mirrors2D.push( { type:MirrorType.PLANE, p:c, n:n } );
-        }
-    }
-    else {
-        // hyperbolic space
-        // a set of inversion spheres, each with radius R passing through two neighboring vertices
-        R = -1 / f;
-        var d = t * Math.cos( Math.PI / N ) + Math.sqrt( R*R - Math.pow( t * Math.sin( Math.PI / N ), 2 ) );
-        for( var i = 0; i < N; ++i ) {
-            var theta = i * 2 * Math.PI / N;
-            var p = p3( d * Math.cos( theta ), d * Math.sin( theta ), 0 );
-            spec.mirrors2D.push( { type:MirrorType.SPHERE, p:p, r:R } );
-        }
-    }*/
 }
 
 function getMousePos(canvas, evt) {
@@ -261,11 +223,12 @@ function init() {
     ctx = canvas.getContext('2d');
 
     depth = 2;
+    mirror_lists = getMirrorLists( 2*depth + 1, depth );
 
     sliders = [];
-    sliders[0] = { x: 10, y:10, width:canvas.width-20, height:20, value:0.6, handle_rect:{} };
-    sliders[1] = { x: 10, y:40, width:canvas.width-20, height:20, value:0.5, handle_rect:{} };
-    sliders[2] = { x: 10, y:70, width:canvas.width-20, height:20, value:0.0, handle_rect:{} };
+    sliders[0] = { x: 10, y:10, width:canvas.width-20, height:20, value:sliderPosFromCurvature(1), handle_rect:{} };
+    sliders[1] = { x: 10, y:40, width:canvas.width-20, height:20, value:sliderPosFromCurvature(0), handle_rect:{} };
+    sliders[2] = { x: 10, y:70, width:canvas.width-20, height:20, value:sliderPosFromCurvature(0), handle_rect:{} };
     isActiveSlider = -1;
     
     theta = Math.PI / 2;
