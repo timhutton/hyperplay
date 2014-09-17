@@ -3,7 +3,9 @@ hyperplay
 
 *Explore tilings on the hyperbolic plane*
 
-[**PLAY HERE!**](http://timhutton.github.io/hyperplay/) (or, if you are feeling adventurous, you can play the advanced version [here](http://timhutton.github.io/hyperplay/index_sliders.html))
+[**PLAY HERE!**](http://timhutton.github.io/hyperplay/) 
+
+(Or, if you are feeling adventurous, you can play the advanced version [here](http://timhutton.github.io/hyperplay/index_sliders.html). Look on the [wiki](https://github.com/timhutton/hyperplay/wiki) for some interesting starting points.)
 
 Usage:
 ------
