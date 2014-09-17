@@ -98,7 +98,8 @@ function makeMirror2D( p1, p2, c, f ) {
         var R = 1 / f;
         var mid = mul( add( p1, p2 ), 0.5 );
         var cn = normalize( cross( sub( p1, c ), sub( p2, c ) ) );
-        var c2 = add( c, mul( cn, R ) );
+        var cR = Math.sqrt( R*R - len2( sub( p1, c ) ) );
+        var c2 = add( c, mul( cn, cR ) );
         var n = normalize( cross( sub( p1, c2 ), sub( p2, c2 ) ) );
         return { type:MirrorType.PLANE, p:c2, n:n };
     }
