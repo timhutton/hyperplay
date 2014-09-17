@@ -6,16 +6,20 @@
 
 var MirrorType = { SPHERE:1, PLANE:2 };
 
-function add( a, b ) { return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }; }
-function sub( a, b ) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
-function mul( a, f ) { return { x: a.x * f, y: a.y * f, z: a.z * f }; }
-function dot( a, b ) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-function len2( a ) { return dot(a,a); }
-function assign( a, b ) { a.x = b.x; a.y = b.y; a.z = b.z }
-function normalize( a ) { return mul( a, 1 / Math.sqrt( len2( a ) ) ); }
-function cross( a, b ) { return { x: a.y * b.z - a.z * b.y, y: a.z*b.x - a.x * b.z, z: a.x * b.y - a.y * b.x }; }
 function p3( x, y, z ) { return { x:x, y:y, z:z }; }
 function p2( x, y ) { return { x:x, y:y }; }
+function origin() { return p3(0,0,0); }
+function xaxis() { return p3(1,0,0); }
+function yaxis() { return p3(0,1,0); }
+function zaxis() { return p3(0,0,0); }
+function add( a, b ) { return p3( a.x + b.x, a.y + b.y, a.z + b.z ); }
+function sub( a, b ) { return p3( a.x - b.x, a.y - b.y, a.z - b.z ); }
+function mul( a, f ) { return p3( a.x * f, a.y * f, a.z * f ); }
+function dot( a, b ) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+function len2( a ) { return dot(a,a); }
+function assign( a, b ) { a.x = b.x; a.y = b.y; a.z = b.z; }
+function normalize( a ) { return mul( a, 1 / Math.sqrt( len2( a ) ) ); }
+function cross( a, b ) { return p3( a.y * b.z - a.z * b.y, a.z*b.x - a.x * b.z, a.x * b.y - a.y * b.x ); }
 
 var depth;
 var mirror_lists;
@@ -108,6 +112,28 @@ function makeMirror2D( p1, p2, c, f ) {
     }
 }
 
+function makeMirror3D( p, c, c2, f ) {
+    // given a vertex and the center of a face on a polyhedron with center c2
+    // return a suitable Wythoff mirror for space curvature f
+    if( Math.abs( f ) < 1e-4 ) {
+        // f=0 : a flat mirror in the same plane as the face
+        var n = normalize( sub( c, c2 ) );
+        return { type:MirrorType.PLANE, p:c, n:n };
+    }
+    else if( f > 0 ) {
+        // positive curvature: can make a 4D polyhedron by reflecting at an angle
+        // TODO: need a fourth dimension for this
+    }
+    else {
+        // negative curvature, hyperbolic space: make an inversion sphere positioned to intersect the vertex (away from the center)
+        var R = -1 / f;
+        var n = normalize( sub( c, c2 ) );
+        var d = Math.sqrt( R*R - len2( sub( p, c ) ) );
+        var mc = add( c, mul( n, d ) );
+        return { type:MirrorType.SPHERE, p:mc, r:R };
+    }
+}
+
 function makeMesh() {
     // f is the curvature of space.
     // f=0 means flat Euclidean space. each mirror is a simple plane reflection.
@@ -122,56 +148,91 @@ function makeMesh() {
 
     // start with a line segment in the center (embedded in R3)
     var edge_length = 1;
-    var edge = [ p3(-edge_length/2,0,0), p3(edge_length/2,0,0) ];
+    var base_edge = [ p3(-edge_length/2,0,0), p3(edge_length/2,0,0) ];
     
     // make a mirror from each endpoint of the line segment
     var mirrors1D = [];
-    for( var iVert in edge )
-        mirrors1D.push( makeMirror1D( edge[ iVert ], f1 ) );
+    for( var iVert in base_edge )
+        mirrors1D.push( makeMirror1D( base_edge[ iVert ], f1 ) );
     
     // make a polygon using the line segment and the mirrors, up to a certain depth
     // this case is a little different to the next ones, because we need a specific order to draw the edges
     // e.g. depth=3: m0(m1(m0(p1))), m0(m1(p0)), m0(p1), p0, p1, m1(p0), m1(m0(p1)), m1(m0(m1(p0)))
-    var polygon = edge.slice();
+    var base_polygon = base_edge.slice();
     for( var iDepth = 0; iDepth < depth; ++iDepth ) {
-        var a = reflect( polygon[ polygon.length-1 ], mirrors1D[ 0 ] );
-        var b = reflect( polygon[ 0 ], mirrors1D[ 1 ] );
-        polygon.splice( 0, 0, a );
-        polygon.push( b );
+        var a = reflect( base_polygon[ base_polygon.length-1 ], mirrors1D[ 0 ] );
+        var b = reflect( base_polygon[ 0 ], mirrors1D[ 1 ] );
+        base_polygon.splice( 0, 0, a );
+        base_polygon.push( b );
     }
     
     if( f1 <= 0 ) 
     {
-        mesh = [ [ polygon ] ]; // stop at level 1 (a single polyhedron with a single polygon in it)
+        mesh = [ [ base_polygon ] ]; // stop at level 1 (a single polyhedron with a single polygon in it)
         return;
     }
 
     // make a 2D mirror from each edge of the polygon
     var polygon_center = mirrors1D[ 0 ].p; // (all the mirrors have the same center for f1 > 0)
     var mirrors2D = [];
-    for( var iVert = 1; iVert < polygon.length; ++iVert )
-        mirrors2D.push( makeMirror2D( polygon[ iVert-1 ], polygon[ iVert ], polygon_center, f2 ) );
+    for( var iVert = 1; iVert < base_polygon.length; ++iVert )
+        mirrors2D.push( makeMirror2D( base_polygon[ iVert-1 ], base_polygon[ iVert ], polygon_center, f2 ) );
     
     // make a 2D mesh using the polygon and the mirrors, up to a certain depth
-    var polyhedron = [];
+    var base_polyhedron = [];
+    var polygon_centers = [];
     for( var iList in mirror_lists ) {
         var mirror_list = mirror_lists[ iList ];
         // reflect the polygon in this sequence of mirrors
         var new_polygon = [];
-        for( var iVert in polygon ) {
+        for( var iVert in base_polygon ) {
             var p = {};
-            assign( p, polygon[ iVert ] );
+            assign( p, base_polygon[ iVert ] );
             for( var iMirror in mirror_list )
                 assign( p, reflect( p, mirrors2D[ mirror_list[ iMirror ] ] ) );
             new_polygon[ iVert ] = p;
         }
-        polyhedron.push( new_polygon );
+        base_polyhedron.push( new_polygon );
+        // also transform the center of the base_polygon, since we need it later
+        var p = {};
+        assign( p, polygon_center );
+        for( var iMirror in mirror_list )
+            assign( p, reflect( p, mirrors2D[ mirror_list[ iMirror ] ] ) );
+        polygon_centers.push( p );
     }
     
-    //if( f2 <= 0 ) (for now we only have two sliders)
+    if( f2 <= 0 || f3 > 0 ) // f3>0 means generating 4D coordinates, which we haven't done yet
     {
-        mesh = [ polyhedron ]; // stop at level 2 (a single polyhedron)
+        mesh = [ base_polyhedron ]; // stop at level 2 (a single polyhedron)
         return;
+    }
+    
+    // make a mirror from each face of the polyhedron
+    var polyhedron_center = mirrors2D[ 0 ].p; // (all the mirrors have the same center for f2 > 0)
+    var mirrors3D = [];
+    for( var iPolygon in base_polyhedron ) {
+        mirrors3D.push( makeMirror3D( base_polyhedron[ iPolygon ][0], polygon_centers[ iPolygon ], polyhedron_center, f3 ) );
+    }
+    
+    // make a 3D mesh using the polyhedron and the mirrors, up to a certain depth
+    mesh = [];
+    for( var iList in mirror_lists ) {
+        var mirror_list = mirror_lists[ iList ];
+        // reflect the polyhedron in this sequence of mirrors
+        var new_polyhedron = [];
+        for( var iPolygon in base_polyhedron ) {
+            var polygon = base_polyhedron[ iPolygon ];
+            var new_polygon = [];
+            for( var iVert in polygon ) {
+                var p = {};
+                assign( p, polygon[ iVert ] );
+                for( var iMirror in mirror_list )
+                    assign( p, reflect( p, mirrors3D[ mirror_list[ iMirror ] ] ) );
+                new_polygon[ iVert ] = p;
+            }
+            new_polyhedron.push( new_polygon );
+        }
+        mesh.push( new_polyhedron );
     }
 }
 
@@ -314,7 +375,7 @@ function drawRect( x, y, w, h ) {
 function drawUI() {
     // draw the sliders
     ctx.strokeStyle="rgb(0,0,0)";
-    for( var iSlider = 0; iSlider < 2/*sliders.length*/; ++iSlider ) {
+    for( var iSlider = 0; iSlider < sliders.length; ++iSlider ) {
         var slider = sliders[ iSlider ];
         ctx.fillStyle="rgb(255,255,255)";
         drawRect( slider.x, slider.y + slider.height/3, slider.width, slider.height/3 ); // rail
@@ -331,7 +392,7 @@ function drawUI() {
     ctx.textBaseline = "bottom";
     ctx.fillText("Curvature: "+curvatureFromSliderPos( sliders[0].value ).toFixed(3)+", "
                               +curvatureFromSliderPos( sliders[1].value ).toFixed(3)+", "
-                              //+curvatureFromSliderPos( sliders[2].value ).toFixed(3)+", "
+                              +curvatureFromSliderPos( sliders[2].value ).toFixed(3)+", "
                               ,20,canvas.height-20);
 }
 
@@ -356,18 +417,18 @@ instructions how to enable JavaScript in your web browser</a>.
 <body>
 <p align="center"><canvas id="canvas" width="1000" height="600">(Canvas drawing not supported by your browser.)</canvas></p>
 
-<p>What the heck am I looking at?</p>
+<p>OK the heck am I looking at this time?</p>
 <ul>
 <li>In the center is a line segment of unit length. It never changes.
 <li>We make copies of it, at different angles. Slider 1 controls the curvature. By default it makes a hexagon.
 <li>We then make copies of the resulting polygon by reflecting it in its edges. Slider 2 controls the curvature of that.
-<li>We could keep going, with more sliders....
-<li>More information and links here: <a href="https://github.com/timhutton/hyperplay">https://github.com/timhutton/hyperplay</a>
+<li>We then make copies of the resulting polyhedron by reflecting it in its faces. Slider 3 controls the curvature of that.
+<li>Currently we only support negative or zero curvature for slider 3, because we'd need 4D rendering otherwise.
+<li>More information and links here: <a href="https://github.com/timhutton/hyperplay">https://github.com/timhutton/hyperplay</a> (and a simpler version of this! gosh, I don't blame you)
 </ul>
 
 <p>TODO:</p>
 <ul>
-<li>Get the third slider working.
 <li>Code to parse curvatures from URL, and button to save curvatures to URL for sharing.
 <li>Allow recursion depth at each level to be controlled.
 </ul>
