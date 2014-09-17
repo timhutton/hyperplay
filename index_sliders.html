@@ -29,6 +29,7 @@ var camera;
 var sliders;
 var iActiveSlider;
 var curvatureRange = 10;
+var isSpinning = true;
 
 function curvatureFromSliderPos( v ) { return ( v - 0.5 ) * curvatureRange; }
 function sliderPosFromCurvature( f ) { return f / curvatureRange + 0.5; }
@@ -256,9 +257,10 @@ function onMouseDown( evt ) {
     for( var iSlider in sliders ) {
         if( pointInRect( pos, sliders[ iSlider ].handle_rect ) ) {
             iActiveSlider = iSlider;
-            break;
+            return;
         }
     }
+    isSpinning = !isSpinning;
 }
 
 function onMouseUp( evt ) {
@@ -292,6 +294,15 @@ function init() {
     sliders[2] = { x: 10, y:70, width:canvas.width-20, height:20, value:sliderPosFromCurvature(0), handle_rect:{} };
     isActiveSlider = -1;
     
+    // parse the parameters from the URL
+    if( window.location.search.length > 0 ) {
+        var params = window.location.search.match( /f\d=[\d\.-]+/g );
+        if( params.length == sliders.length ) {
+            for( var iSlider in sliders )
+                sliders[ iSlider ].value = sliderPosFromCurvature( params[ iSlider ].split('=')[1] );
+        }
+    }
+
     theta = Math.PI / 2;
     camera = { p:p3(0,3,-6),
                x:p3(1,0,0), 
@@ -397,10 +408,22 @@ function drawUI() {
 }
 
 function animate() {
-    // rotate round
-    theta += 0.01;
-    repositionCamera();
-    redraw();
+    if( isSpinning ) {
+        // rotate round
+        theta += 0.01;
+        repositionCamera();
+        redraw();
+    }
+}
+
+function shareThisShape() {
+    var new_url = window.location.protocol + '//' + window.location.host + window.location.pathname + "?";
+    for( var iSlider in sliders ) {
+        if( iSlider > 0)
+            new_url += "&";
+        new_url += "f" + iSlider + "=" + curvatureFromSliderPos( sliders[ iSlider ].value ).toFixed(3);
+    }
+    window.location.href = new_url;
 }
 
 window.onload = init;
@@ -415,7 +438,10 @@ instructions how to enable JavaScript in your web browser</a>.
 </head>
 
 <body>
+
 <p align="center"><canvas id="canvas" width="1000" height="600">(Canvas drawing not supported by your browser.)</canvas></p>
+
+<input type="button" value="Share this shape (copy the url afterwards)" onclick="shareThisShape();">
 
 <p>OK the heck am I looking at this time?</p>
 <ul>
@@ -425,11 +451,11 @@ instructions how to enable JavaScript in your web browser</a>.
 <li>We then make copies of the resulting polyhedron by reflecting it in its faces. Slider 3 controls the curvature of that.
 <li>Currently we only support negative or zero curvature for slider 3, because we'd need 4D rendering otherwise.
 <li>More information and links here: <a href="https://github.com/timhutton/hyperplay">https://github.com/timhutton/hyperplay</a> (and a simpler version of this! gosh, I don't blame you)
+<li>Click on the image to start/stop the spinning.
 </ul>
 
 <p>TODO:</p>
 <ul>
-<li>Code to parse curvatures from URL, and button to save curvatures to URL for sharing.
 <li>Allow recursion depth at each level to be controlled.
 </ul>
 
