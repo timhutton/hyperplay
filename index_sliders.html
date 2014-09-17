@@ -302,9 +302,9 @@ function init() {
         if( params.length == sliders.length ) {
             for( var iSlider in sliders )
                 sliders[ iSlider ].value = sliderPosFromCurvature( params[ iSlider ].split('=')[1] );
-            updateShareLink();
         }
     }
+    updateShareLink();
 
     theta = Math.PI / 2;
     camera = { p:p3(0,3,-6),
