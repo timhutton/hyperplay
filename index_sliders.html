@@ -24,7 +24,7 @@ var camera;
 var sliders;
 var iActiveSlider;
 
-function curvatureFromSliderPos( v ) { return ( v - 0.5 ) * 5; } // map [0,1] onto [-c,c] curvature
+function curvatureFromSliderPos( v ) { return ( v - 0.5 ) * 10; } // map [0,1] onto [-c,c] curvature
 
 function getMirrorLists( N, d ) {
     // returns e.g (N=3,d=2) [ [], [0], [1], [2], [0,1], [0,2], [1,0], [1,2], [2,0], [2,1] ]
@@ -57,6 +57,57 @@ function reflect( p, mirror ) {
     }
 }
 
+function makeMirror1D( p, f ) {
+    // given an endpoint of a line segment centered at the origin and lying along the x-axis
+    // return a suitable Wythoff mirror for space curvature f
+    if( Math.abs( f ) < 1e-4 ) {
+        // f=0 : infinite straight line reflections to make a 1D lattice
+        return { type:MirrorType.PLANE, p:p, n:normalize(p) };
+    }
+    else if( f > 0 ) {
+        // positive curvature: can make a polygon by reflecting at an angle
+        var R = 1 / f;
+        var c = p3( 0, Math.sqrt( R*R - len2(p) ), 0 );
+        var v = normalize( sub( p, c ) );
+        return { type:MirrorType.PLANE, p:c, n:p3(-v.y,v.x,0) };
+    }
+    else {
+        // negative curvature, hyperbolic space: make an inversion sphere positioned further along the x-axis
+        var R = -1 / f;
+        var n = normalize( p );
+        return { type:MirrorType.SPHERE, p:add( p, mul( n, R ) ), r:R };
+    }
+}
+
+function makeMirror2D( p1, p2, c, f ) {
+    // given two vertices of an edge of a polygon with center c
+    // return a suitable Wythoff mirror for space curvature f
+    if( Math.abs( f ) < 1e-4 ) {
+        // f=0 : a flat mirror in the same plane
+        var mid = mul( add( p1, p2 ), 0.5 );
+        var n = normalize( sub( mid, c ) );
+        return { type:MirrorType.PLANE, p:mid, n:n };
+    }
+    else if( f > 0 ) {
+        // positive curvature: can make a polyhedron by reflecting at an angle
+        var R = 1 / f;
+        var mid = mul( add( p1, p2 ), 0.5 );
+        var cn = normalize( cross( sub( p1, c ), sub( p2, c ) ) );
+        var c2 = add( c, mul( cn, R ) );
+        var n = normalize( cross( sub( p1, c2 ), sub( p2, c2 ) ) );
+        return { type:MirrorType.PLANE, p:c2, n:n };
+    }
+    else {
+        // negative curvature, hyperbolic space: make an inversion sphere positioned to intersect the two vertices (away from the center)
+        var R = -1 / f;
+        var mid = mul( add( p1, p2 ), 0.5 );
+        var n = normalize( sub( mid, c ) );
+        var d = Math.sqrt( R*R - len2( sub( p1, mid ) ) );
+        var c2 = add( mid, mul( n, d ) );
+        return { type:MirrorType.SPHERE, p:c2, r:R };
+    }
+}
+
 function makeMesh() {
     // f is the curvature of space.
     // f=0 means flat Euclidean space. each mirror is a simple plane reflection.
@@ -71,44 +122,63 @@ function makeMesh() {
 
     // start with a line segment in the center (embedded in R3)
     var edge_length = 1;
-    var mesh0 = [ p3(-edge_length/2,0,0), p3(edge_length/2,0,0) ];
+    var edge = [ p3(-edge_length/2,0,0), p3(edge_length/2,0,0) ];
     
     // work in progress!
     
-    // make the 1D mirrors (each endpoint of the line segment becomes a mirror)
+    // make a 1D mirror from each endpoint of the line segment
     var mirrors1D = [];
-    if( Math.abs( f1 ) < 1e-4 ) {
-        // f=0 : infinite straight line reflections to make a 1D lattice
-        mirrors1D[ 0 ] = { type:MirrorType.PLANE, p:mesh0[0], n:normalize(sub(mesh0[0],mesh0[1])) };
-        mirrors1D[ 1 ] = { type:MirrorType.PLANE, p:mesh0[1], n:normalize(sub(mesh0[1],mesh0[0])) };
-    }
-    else if( f1 > 0 ) {
-        // spherical space: make a circle
-        var R = 1 / f1;
-        var c = p3( 0, Math.sqrt( R*R - edge_length*edge_length/4 ), 0 );
-        var v = normalize( sub( mesh0[0], c ) );
-        mirrors1D[ 0 ] = { type:MirrorType.PLANE, p:c, n:p3(-v.y,v.x,0) };
-        mirrors1D[ 1 ] = { type:MirrorType.PLANE, p:c, n:p3(v.y,v.x,0) };
-    }
-    else {
-        // hyperbolic space
-        var R = -1 / f1;
-        mirrors1D[ 0 ] = { type:MirrorType.SPHERE, p:p3(mesh0[0].x-R,0,0), r:R };
-        mirrors1D[ 1 ] = { type:MirrorType.SPHERE, p:p3(mesh0[1].x+R,0,0), r:R };
+    for( var iVert in edge ) {
+        mirrors1D.push( makeMirror1D( edge[ iVert ], f1 ) );
     }
     
-    // make the 1D mesh
+    // make the 1D mesh using the line segment and the mirrors, up to a certain depth
     // this case is a little different to the next ones, because we need a specific order to draw the edges
     // e.g. depth=3: m0(m1(m0(p1))), m0(m1(p0)), m0(p1), p0, p1, m1(p0), m1(m0(p1)), m1(m0(m1(p0)))
-    var mesh1 = mesh0;
+    var polygon = edge.slice();
     for( var iDepth = 0; iDepth < depth; ++iDepth ) {
-        var a = reflect( mesh1[ mesh1.length-1 ], mirrors1D[ 0 ] );
-        var b = reflect( mesh1[ 0 ], mirrors1D[ 1 ] );
-        mesh1.splice( 0, 0, a );
-        mesh1.push( b );
+        var a = reflect( polygon[ polygon.length-1 ], mirrors1D[ 0 ] );
+        var b = reflect( polygon[ 0 ], mirrors1D[ 1 ] );
+        polygon.splice( 0, 0, a );
+        polygon.push( b );
     }
-    mesh = [ [ mesh1 ] ];
+    
+    if( f1 <= 0 ) 
+    {
+        mesh = [ [ polygon ] ]; // stop at level 1 (a single polyhedron with a single polygon in it)
+        return;
+    }
 
+    // make a 2D mirror from each edge of the polygon
+    var mirrors2D = [];
+    var polygon_center = mirrors1D[ 0 ].p; // (all the 1D mirrors have the same center)
+    for( var iVert = 1; iVert < polygon.length; ++iVert ) {
+        mirrors2D.push( makeMirror2D( polygon[ iVert-1 ], polygon[ iVert ], polygon_center, f2 ) );
+    }
+    
+    // make a 2D mesh using the polygon and the mirrors, up to a certain depth
+    var polyhedron = [ polygon ];
+    var mirror_lists = getMirrorLists( mirrors2D.length, depth );
+    for( var iList in mirror_lists ) {
+        var mirror_list = mirror_lists[ iList ];
+        // reflect the polygon of polygon in this sequence of lists
+        var new_polygon = [];
+        for( var iVert in polygon ) {
+            var p = {};
+            assign( p, polygon[ iVert ] );
+            for( var iMirror in mirror_list )
+                assign( p, reflect( p, mirrors2D[ mirror_list[ iMirror ] ] ) );
+            new_polygon[ iVert ] = p;
+        }
+        polyhedron.push( new_polygon );
+    }
+    
+    //if( f2 <= 0 ) 
+    {
+        mesh = [ polyhedron ]; // stop at level 2 (a single polyhedron)
+        return;
+    }
+    
     /*
     // make the 2D mirrors
     if( Math.abs( f2 ) < 1e-4 ) {
@@ -190,7 +260,7 @@ function init() {
     canvas = document.getElementById('canvas');
     ctx = canvas.getContext('2d');
 
-    depth = 4;
+    depth = 2;
 
     sliders = [];
     sliders[0] = { x: 10, y:10, width:canvas.width-20, height:20, value:0.51, handle_rect:{} };
@@ -321,6 +391,11 @@ instructions how to enable JavaScript in your web browser</a>.
 
 <body>
 <p align="center"><canvas id="canvas" width="1000" height="600">(Canvas drawing not supported by your browser.)</canvas></p>
+
+<p>TODO:</p>
+<ul>
+<li>Code to parse curvatures from URL, and button to save curvatures to URL for sharing
+</ul>
 
 </html>
 
