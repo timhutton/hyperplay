@@ -78,9 +78,9 @@ function makeMirror1D( p, f ) {
     }
     else {
         // negative curvature, hyperbolic space: make an inversion sphere positioned further along the x-axis
-        var R = -1 / f;
+        var R = 1 / f;
         var n = normalize( p );
-        return { type:MirrorType.SPHERE, p:add( p, mul( n, R ) ), r:R };
+        return { type:MirrorType.SPHERE, p:add( p, mul( n, R ) ), r2:R*R };
     }
 }
 
@@ -105,12 +105,13 @@ function makeMirror2D( p1, p2, c, f ) {
     }
     else {
         // negative curvature, hyperbolic space: make an inversion sphere positioned to intersect the two vertices (away from the center)
-        var R = -1 / f;
+        var R = 1 / f;
         var mid = mul( add( p1, p2 ), 0.5 );
         var n = normalize( sub( mid, c ) );
         var d = Math.sqrt( R*R - len2( sub( p1, mid ) ) );
         var c2 = add( mid, mul( n, d ) );
-        return { type:MirrorType.SPHERE, p:c2, r:R };
+        //if( f > 0 ) c2 = sub( mid, mul( n, d ) ); // could use stereographic projection here to stay in 2D
+        return { type:MirrorType.SPHERE, p:c2, r2:R*R };
     }
 }
 
@@ -122,17 +123,18 @@ function makeMirror3D( p, c, c2, f ) {
         var n = normalize( sub( c, c2 ) );
         return { type:MirrorType.PLANE, p:c, n:n };
     }
-    else if( f > 0 ) {
-        // positive curvature: can make a 4D polyhedron by reflecting at an angle
-        // TODO: need a fourth dimension for this
-    }
     else {
-        // negative curvature, hyperbolic space: make an inversion sphere positioned to intersect the vertex (away from the center)
-        var R = -1 / f;
+        // positive *or* negative curvature: make an inversion sphere positioned to intersect the vertex
+        // (away from the face center if negative curvature, in from the face center if positive curvature)
+        var R = 1 / f;
         var n = normalize( sub( c, c2 ) );
         var d = Math.sqrt( R*R - len2( sub( p, c ) ) );
-        var mc = add( c, mul( n, d ) );
-        return { type:MirrorType.SPHERE, p:mc, r:R };
+        var mc;
+        if( f < 0 )
+            mc = add( c, mul( n, d ) );
+        else
+            mc = sub( c, mul( n, d ) );
+        return { type:MirrorType.SPHERE, p:mc, r2:R*R };
     }
 }
 
@@ -203,9 +205,9 @@ function makeMesh() {
         polygon_centers.push( p );
     }
     
-    if( f2 <= 0 || f3 > 0 ) // f3>0 means generating 4D coordinates, which we haven't done yet
+    if( f2 <= 0 )
     {
-        mesh = [ base_polyhedron ]; // stop at level 2 (a single polyhedron)
+        mesh = [ base_polyhedron ]; // stop at level 2 (a single polyhedron/tiling)
         return;
     }
     
@@ -293,15 +295,17 @@ function init() {
     sliders = [];
     sliders[0] = { x: 10, y:10, width:canvas.width-20, height:20, value:sliderPosFromCurvature(1), handle_rect:{} };
     sliders[1] = { x: 10, y:40, width:canvas.width-20, height:20, value:sliderPosFromCurvature(0), handle_rect:{} };
-    sliders[2] = { x: 10, y:70, width:canvas.width-20, height:20, value:sliderPosFromCurvature(0), handle_rect:{} };
+    sliders[2] = { x: 10, y:70, width:canvas.width-20, height:20, value:0, handle_rect:{} };
     isActiveSlider = -1;
     
     // parse the parameters from the URL
     if( window.location.search.length > 0 ) {
         var params = window.location.search.match( /f\d=[\d\.-]+/g );
-        if( params.length == sliders.length ) {
-            for( var iSlider in sliders )
-                sliders[ iSlider ].value = sliderPosFromCurvature( params[ iSlider ].split('=')[1] );
+        if( params.length <= sliders.length ) {
+            for( var iSlider in sliders ) 
+                sliders[ iSlider ].value = 0; // effectively turn this one off until we hear otherwise
+            for( var iParam in params )
+                sliders[ iParam ].value = sliderPosFromCurvature( params[ iParam ].split('=')[1] );
         }
     }
     updateShareLink();
@@ -326,14 +330,14 @@ function init() {
     canvas.addEventListener( 'mousedown',  onMouseDown, false );
     canvas.addEventListener( 'touchend', onMouseUp, false );
     canvas.addEventListener( 'mouseup',  onMouseUp, false );
+    canvas.addEventListener( 'mouseout',  onMouseUp, false );
 
     setInterval( animate, 20 );
 }
 
 function sphereInversion( p, sphere ) {
-    var r2 = sphere.r * sphere.r;
     var d2 = len2( sub( p, sphere.p ) );
-    return add( sphere.p, mul( sub( p, sphere.p ), r2 / d2 ) );
+    return add( sphere.p, mul( sub( p, sphere.p ), sphere.r2 / d2 ) );
 }
 
 function planeReflection( p, plane ) {
@@ -359,7 +363,6 @@ function drawMesh() {
     ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
     // draw the mesh
-    ctx.fillStyle = "rgba(200,210,255,0.1)";
     ctx.strokeStyle = "rgba(0,0,0,0.3)";
     for( var iPolyhedron in mesh ) {
         var polyhedron = mesh[ iPolyhedron ];
@@ -372,9 +375,7 @@ function drawMesh() {
                 var draw_p = camera_projection( polygon[ iVert ], camera );
                 ctx.lineTo( draw_p.x, draw_p.y );
             }
-            ctx.fill();
             ctx.stroke();
-            // (we deliberately don't call closePath, in order to leave the last side without a line)
         }
     }
 }
@@ -452,7 +453,6 @@ instructions how to enable JavaScript in your web browser</a>.
 <li>We make copies of it, at different angles. Slider 1 controls the curvature. By default it makes a hexagon.
 <li>We then make copies of the resulting polygon by reflecting it in its edges. Slider 2 controls the curvature of that.
 <li>We then make copies of the resulting polyhedron by reflecting it in its faces. Slider 3 controls the curvature of that.
-<li>Currently we only support negative or zero curvature for slider 3, because we'd need 4D rendering otherwise.
 <li>More information and links here: <a href="https://github.com/timhutton/hyperplay">https://github.com/timhutton/hyperplay</a> (and a simpler version of this! gosh, I don't blame you)
 <li>Click on the image to start/stop the spinning.
 </ul>
@@ -460,6 +460,7 @@ instructions how to enable JavaScript in your web browser</a>.
 <p>TODO:</p>
 <ul>
 <li>Allow recursion depth at each level to be controlled.
+<li>Better rendering!
 </ul>
 
 </html>
