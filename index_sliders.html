@@ -170,8 +170,7 @@ function makeMesh() {
         base_polygon.push( b );
     }
     
-    if( f1 <= 0 ) 
-    {
+    if( f1 <= 0 ) {
         mesh = [ [ base_polygon ] ]; // stop at level 1 (a single polyhedron with a single polygon in it)
         return;
     }
@@ -205,8 +204,7 @@ function makeMesh() {
         polygon_centers.push( p );
     }
     
-    if( f2 <= 0 )
-    {
+    if( f2 <= 0 ) {
         mesh = [ base_polyhedron ]; // stop at level 2 (a single polyhedron/tiling)
         return;
     }
@@ -331,8 +329,8 @@ function init() {
     canvas.addEventListener( 'touchend', onMouseUp, false );
     canvas.addEventListener( 'mouseup',  onMouseUp, false );
     canvas.addEventListener( 'mouseout',  onMouseUp, false );
-
-    setInterval( animate, 20 );
+    
+    animate();
 }
 
 function sphereInversion( p, sphere ) {
@@ -439,6 +437,7 @@ function animate() {
         repositionCamera();
         redraw();
     }
+    requestAnimationFrame( animate );
 }
 
 function updateShareLink() {
