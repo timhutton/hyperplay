@@ -363,7 +363,8 @@ function drawMesh() {
     ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
     // draw the mesh
-    ctx.strokeStyle = "rgba(0,0,0,0.3)";
+    // (first the faces, then the edges, else the wrong z-ordering breaks things)
+    ctx.fillStyle = "rgba(200,210,255,0.1)";
     for( var iPolyhedron in mesh ) {
         var polyhedron = mesh[ iPolyhedron ];
         for( var iPolygon in polyhedron ) {
@@ -375,9 +376,24 @@ function drawMesh() {
                 var draw_p = camera_projection( polygon[ iVert ], camera );
                 ctx.lineTo( draw_p.x, draw_p.y );
             }
-            ctx.stroke();
+            ctx.fill();
         }
     }
+    ctx.strokeStyle = "rgba(0,0,0,0.5)";
+    ctx.beginPath();
+    for( var iPolyhedron in mesh ) {
+        var polyhedron = mesh[ iPolyhedron ];
+        for( var iPolygon in polyhedron ) {
+            var polygon = polyhedron[ iPolygon ];
+            var draw_p = camera_projection( polygon[ 0 ], camera );
+            ctx.moveTo( draw_p.x, draw_p.y );
+            for( var iVert = 1; iVert < polygon.length; ++iVert ) {
+                var draw_p = camera_projection( polygon[ iVert ], camera );
+                ctx.lineTo( draw_p.x, draw_p.y );
+            }
+        }
+    }
+    ctx.stroke();
 }
 
 function drawRect( x, y, w, h ) {
