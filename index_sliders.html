@@ -359,38 +359,43 @@ function redraw() {
 }
 
 function drawMesh() {
+
+    // project the mesh onto the screen
+    var face_list = [];
+    for( var iPolyhedron in mesh ) {
+        var polyhedron = mesh[ iPolyhedron ];
+        for( var iPolygon in polyhedron ) {
+            var polygon = polyhedron[ iPolygon ];
+            var vertex_list = new Array( polygon.length );
+            for( var iVert = 0; iVert < polygon.length; ++iVert ) {
+                vertex_list[ iVert ] = camera_projection( polygon[ iVert ], camera );
+            }
+            face_list.push( vertex_list );
+        }
+    }
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
     // draw the mesh
     // (first the faces, then the edges, else the wrong z-ordering breaks things)
     ctx.fillStyle = "rgba(200,210,255,0.1)";
-    for( var iPolyhedron in mesh ) {
-        var polyhedron = mesh[ iPolyhedron ];
-        for( var iPolygon in polyhedron ) {
-            var polygon = polyhedron[ iPolygon ];
-            ctx.beginPath();
-            var draw_p = camera_projection( polygon[ 0 ], camera );
-            ctx.moveTo( draw_p.x, draw_p.y );
-            for( var iVert = 1; iVert < polygon.length; ++iVert ) {
-                var draw_p = camera_projection( polygon[ iVert ], camera );
-                ctx.lineTo( draw_p.x, draw_p.y );
-            }
-            ctx.fill();
+    for( var iFace in face_list ) {
+        var face = face_list[ iFace ];
+        ctx.beginPath();
+        ctx.moveTo( face[0].x, face[0].y );
+        for( var iVert = 1; iVert < polygon.length; ++iVert ) {
+            ctx.lineTo( face[ iVert ].x, face[ iVert ].y );
         }
+        ctx.fill();
     }
     ctx.strokeStyle = "rgba(0,0,0,0.5)";
     ctx.beginPath();
-    for( var iPolyhedron in mesh ) {
-        var polyhedron = mesh[ iPolyhedron ];
-        for( var iPolygon in polyhedron ) {
-            var polygon = polyhedron[ iPolygon ];
-            var draw_p = camera_projection( polygon[ 0 ], camera );
-            ctx.moveTo( draw_p.x, draw_p.y );
-            for( var iVert = 1; iVert < polygon.length; ++iVert ) {
-                var draw_p = camera_projection( polygon[ iVert ], camera );
-                ctx.lineTo( draw_p.x, draw_p.y );
-            }
+    for( var iFace in face_list ) {
+        var face = face_list[ iFace ];
+        ctx.moveTo( face[0].x, face[0].y );
+        for( var iVert = 1; iVert < polygon.length; ++iVert ) {
+            ctx.lineTo( face[ iVert ].x, face[ iVert ].y );
         }
     }
     ctx.stroke();
