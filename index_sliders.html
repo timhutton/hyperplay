@@ -156,7 +156,7 @@ function makeMesh() {
     
     // make a mirror from each endpoint of the line segment
     var mirrors1D = [];
-    for( var iVert in base_edge )
+    for( var iVert = 0; iVert < base_edge.length; ++iVert )
         mirrors1D.push( makeMirror1D( base_edge[ iVert ], f1 ) );
     
     // make a polygon using the line segment and the mirrors, up to a certain depth
@@ -184,14 +184,14 @@ function makeMesh() {
     // make a 2D mesh using the polygon and the mirrors, up to a certain depth
     var base_polyhedron = [];
     var polygon_centers = [];
-    for( var iList in mirror_lists ) {
+    for( var iList = 0; iList < mirror_lists.length; ++iList ) {
         var mirror_list = mirror_lists[ iList ];
         // reflect the polygon in this sequence of mirrors
         var new_polygon = [];
-        for( var iVert in base_polygon ) {
+        for( var iVert = 0; iVert < base_polygon.length; ++iVert ) {
             var p = {};
             assign( p, base_polygon[ iVert ] );
-            for( var iMirror in mirror_list )
+            for( var iMirror = 0; iMirror < mirror_list.length; ++iMirror )
                 assign( p, reflect( p, mirrors2D[ mirror_list[ iMirror ] ] ) );
             new_polygon[ iVert ] = p;
         }
@@ -199,7 +199,7 @@ function makeMesh() {
         // also transform the center of the base_polygon, since we need it later
         var p = {};
         assign( p, polygon_center );
-        for( var iMirror in mirror_list )
+        for( var iMirror = 0; iMirror < mirror_list.length; ++iMirror )
             assign( p, reflect( p, mirrors2D[ mirror_list[ iMirror ] ] ) );
         polygon_centers.push( p );
     }
@@ -212,23 +212,23 @@ function makeMesh() {
     // make a mirror from each face of the polyhedron
     var polyhedron_center = mirrors2D[ 0 ].p; // (all the mirrors have the same center for f2 > 0)
     var mirrors3D = [];
-    for( var iPolygon in base_polyhedron ) {
+    for( var iPolygon = 0; iPolygon < base_polyhedron.length; ++iPolygon ) {
         mirrors3D.push( makeMirror3D( base_polyhedron[ iPolygon ][0], polygon_centers[ iPolygon ], polyhedron_center, f3 ) );
     }
     
     // make a 3D mesh using the polyhedron and the mirrors, up to a certain depth
     mesh = [];
-    for( var iList in mirror_lists ) {
+    for( var iList = 0; iList < mirror_lists.length; ++iList ) {
         var mirror_list = mirror_lists[ iList ];
         // reflect the polyhedron in this sequence of mirrors
         var new_polyhedron = [];
-        for( var iPolygon in base_polyhedron ) {
+        for( var iPolygon = 0; iPolygon < base_polyhedron.length; ++iPolygon ) {
             var polygon = base_polyhedron[ iPolygon ];
             var new_polygon = [];
-            for( var iVert in polygon ) {
+            for( var iVert = 0; iVert < polygon.length; ++iVert ) {
                 var p = {};
                 assign( p, polygon[ iVert ] );
-                for( var iMirror in mirror_list )
+                for( var iMirror = 0; iMirror < mirror_list.length; ++iMirror )
                     assign( p, reflect( p, mirrors3D[ mirror_list[ iMirror ] ] ) );
                 new_polygon[ iVert ] = p;
             }
@@ -256,13 +256,14 @@ function onMouseMove( evt ) {
 
 function onMouseDown( evt ) {
     var pos = getMousePos( canvas, evt );
-    for( var iSlider in sliders ) {
+    for( var iSlider = 0; iSlider < sliders.length; ++iSlider ) {
         if( pointInRect( pos, sliders[ iSlider ].handle_rect ) ) {
             iActiveSlider = iSlider;
             return;
         }
     }
     isSpinning = !isSpinning;
+    if( isSpinning ) animate();
 }
 
 function onMouseUp( evt ) {
@@ -300,9 +301,9 @@ function init() {
     if( window.location.search.length > 0 ) {
         var params = window.location.search.match( /f\d=[\d\.-]+/g );
         if( params.length <= sliders.length ) {
-            for( var iSlider in sliders ) 
+            for( var iSlider = 0; iSlider < sliders.length; ++iSlider ) 
                 sliders[ iSlider ].value = 0; // effectively turn this one off until we hear otherwise
-            for( var iParam in params )
+            for( var iParam = 0; iParam < params.length; ++iParam )
                 sliders[ iParam ].value = sliderPosFromCurvature( params[ iParam ].split('=')[1] );
         }
     }
@@ -360,9 +361,9 @@ function drawMesh() {
 
     // project the mesh onto the screen
     var face_list = [];
-    for( var iPolyhedron in mesh ) {
+    for( var iPolyhedron = 0; iPolyhedron < mesh.length; ++iPolyhedron ) {
         var polyhedron = mesh[ iPolyhedron ];
-        for( var iPolygon in polyhedron ) {
+        for( var iPolygon = 0; iPolygon < polyhedron.length; ++iPolygon ) {
             var polygon = polyhedron[ iPolygon ];
             var vertex_list = new Array( polygon.length );
             for( var iVert = 0; iVert < polygon.length; ++iVert ) {
@@ -378,7 +379,7 @@ function drawMesh() {
     // draw the mesh
     // (first the faces, then the edges, else the wrong z-ordering breaks things)
     ctx.fillStyle = "rgba(200,210,255,0.1)";
-    for( var iFace in face_list ) {
+    for( var iFace = 0; iFace < face_list.length; ++iFace ) {
         var face = face_list[ iFace ];
         ctx.beginPath();
         ctx.moveTo( face[0].x, face[0].y );
@@ -389,7 +390,7 @@ function drawMesh() {
     }
     ctx.strokeStyle = "rgba(0,0,0,0.5)";
     ctx.beginPath();
-    for( var iFace in face_list ) {
+    for( var iFace = 0; iFace < face_list.length; ++iFace ) {
         var face = face_list[ iFace ];
         ctx.moveTo( face[0].x, face[0].y );
         for( var iVert = 1; iVert < polygon.length; ++iVert ) {
@@ -436,13 +437,13 @@ function animate() {
         theta += 0.01;
         repositionCamera();
         redraw();
+        requestAnimationFrame( animate );
     }
-    requestAnimationFrame( animate );
 }
 
 function updateShareLink() {
     var new_url = window.location.protocol + '//' + window.location.host + window.location.pathname + "?";
-    for( var iSlider in sliders ) {
+    for( var iSlider = 0; iSlider < sliders.length; ++iSlider ) {
         if( iSlider > 0)
             new_url += "&";
         new_url += "f" + iSlider + "=" + curvatureFromSliderPos( sliders[ iSlider ].value ).toFixed(3);
