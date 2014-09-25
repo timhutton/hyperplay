@@ -28,7 +28,7 @@ var theta;
 var camera;
 var sliders;
 var iActiveSlider;
-var curvatureRange = 4;
+var curvatureRange = 5;
 var isSpinning = true;
 
 function curvatureFromSliderPos( v ) { return ( v - 0.5 ) * curvatureRange; }
@@ -268,6 +268,7 @@ function onMouseDown( evt ) {
 
 function onMouseUp( evt ) {
     iActiveSlider = -1;
+    redraw();
 }
 
 function repositionCamera() {
@@ -407,6 +408,15 @@ function drawRect( x, y, w, h ) {
     ctx.stroke();
 }
 
+function margin_angle( v, r ) {
+    // for an N-polytope, if r is the distance 
+    return ( 180.0 / Math.PI ) * 2.0 * Math.acos( v / r );
+}
+
+function sign( x ) {
+    return x?x<0?-1:1:0;
+}
+
 function drawUI() {
     // draw the sliders
     ctx.strokeStyle="rgb(0,0,0)";
@@ -429,6 +439,32 @@ function drawUI() {
                               +curvatureFromSliderPos( sliders[1].value ).toFixed(3)+", "
                               +curvatureFromSliderPos( sliders[2].value ).toFixed(3)+", "
                               ,20,canvas.height-20);
+                              
+    // display some properties of this shape
+    var f1 = curvatureFromSliderPos( sliders[0].value );
+    var r1 = 1.0 / f1;
+    var edge_length = 1.0; // fixed
+    var v = edge_length / 2.0; // distance from center of edge to rotation point
+    var m1 = Math.sqrt( r1*r1 - v*v ); // distance from polygon center to edge midpoint
+    var margin_angle1 = margin_angle( v, r1 ); // internal corner angle (e.g. 60 for a triangle)
+    var angle_defect1 = 180.0 - margin_angle1;
+    var schlafli1 = 360.0 / angle_defect1;
+
+    var f2 = curvatureFromSliderPos( sliders[1].value );
+    var r2 = 1.0 / f2;
+    var m2 = Math.sqrt( r2*r2 - v*v ); // distance from polyhedron center to edge midpoint
+    var margin_angle2 = margin_angle( m1, m2 * sign( r2 ) ); // dihedral angle
+
+    ctx.fillText("Corner angle: "+margin_angle1.toFixed(2)+"\xB0     Dihedral angle: "+margin_angle2.toFixed(2)+"\xB0",20,canvas.height-50);
+    ctx.fillText("Schlafli symbol: { "+schlafli1.toFixed(2)+", ? , ? }",20,canvas.height-80);
+    
+    // TODO: work out full Schlafli symbol, mark interesting places on the sliders
+    
+    // interesting links:
+    // http://en.wikipedia.org/wiki/Angular_defect
+    // http://hddb.teamikaria.com/forum/viewtopic.php?f=3&t=1563
+    // http://gregegan.customer.netspace.net.au/SCIENCE/Dihedral/Dihedral.html
+    // http://en.wikipedia.org/wiki/Table_of_polyhedron_dihedral_angles
 }
 
 function animate() {
