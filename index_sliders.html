@@ -21,7 +21,20 @@ function dist( a, b ) { return Math.sqrt( len2( sub( a, b ) ) ); }
 function assign( a, b ) { a.x = b.x; a.y = b.y; a.z = b.z; }
 function normalize( a ) { return mul( a, 1 / Math.sqrt( len2( a ) ) ); }
 function cross( a, b ) { return p3( a.y * b.z - a.z * b.y, a.z*b.x - a.x * b.z, a.x * b.y - a.y * b.x ); }
-function circle_radius( a, b, c ) { return a*b*c / Math.sqrt( (a+b+c)*(-a+b+c)*(a-b+c)*(a+b-c) ); } // triangle with side lengths a,b,c
+function sphere_radius_from_line_and_two_points( a, b, p1, p2 ) {
+    // What is the radius of the sphere which has center on a line a-b and surface passing through points p1 and p2?
+    // Find the intersection between the line and the plane halfway between p1 and p2 (we assume a solution exists)
+    var mp = mul( add( p1, p2 ), 0.5 );
+    var pn = sub( p1, p2 );
+    var ln = sub( b, a );
+    // at the intersection c of the line and the plane we know that a + t*ln = c and ( c - mp ).pn = 0
+    // hence ( a + t*ln - mp ).pn = 0
+    // hence t*ln.pn + (a-mp).pn = 0
+    // hence t = (mp-a).pn / ln.pn
+    var t = dot( sub( mp, a ), pn ) / dot( ln, pn );
+    var c = add( a, mul( ln, t ) );
+    return dist( c, p1 ); // check: dist(c,p1)==dist(c,p2)
+}
 
 var depth;
 var mirror_lists;
@@ -101,8 +114,8 @@ function getInversionRadiusForStereographicPolyhedron( pc, p1, p2, R ) {
     // One complication is that the point p1 is already on the circumcircle, not on the stereographic plane, and we want the answer in the
     // same plane as the input. But changing planes is just a matter of linear scaling.
     
-    // We reflect p1 across the sphere center, then project back onto the plane.
-    // This gives us a third point on the inversion circle we want, so we can now compute the radius and center.
+    // We reflect p1 across the sphere center, then project back onto the plane. This gives us a third point on the inversion circle we 
+    // want, so we can then fit a circle and compute the radius.
     var v = dist( pc, p1 );
     var h = Math.sqrt( R*R - v*v );
     var c  = p3( pc.x, pc.y, h ); // check: dist(c,p1)==dist(c,p2)==R
@@ -112,27 +125,31 @@ function getInversionRadiusForStereographicPolyhedron( pc, p1, p2, R ) {
     var point_mirror = { type:MirrorType.POINT, p:c };
     var p1_antipodal = reflect( reflect( p1, point_mirror ), stereographic_mirror );
     p1_antipodal = add( sc, mul( sub( p1_antipodal, sc ), ( h + R ) / ( R + R ) ) ); // scale back onto input plane
-    // we now have three points on the circle, what is its radius?
-    return circle_radius( dist( p1, p2 ), dist( p2, p1_antipodal ), dist( p1_antipodal, p1 ) );
+    // we now have a center line and two points for the circle, what is its radius?
+    var mp = mul( add( p1, p2 ), 0.5 );
+    return sphere_radius_from_line_and_two_points( pc, mp, p1, p1_antipodal );
 }
 
-function getInversionRadiusForStereographicPolychoron( c, p1, p2, p3 ) {
-    // if you've got a planar polygon given by three points p1, p2 and p3 that you want to use as a mirror to make a stereographic
-    // projection of a polychoron in a fourth dimension, with center c, what is the inversion sphere needed
+function getInversionRadiusForStereographicPolychoron( pc, c, p, R ) {
+    // If you've got a polyhedron with center pc with a face, given by center c and a vertex p, that you want to use as a mirror to make a stereographic
+    // projection of a polychoron in a fourth dimension, with radius R, what is the radius of the inversion sphere needed?
     
-    // We need to construct another point that lies on the mirror. Then four points determine the inversion sphere, if not coplanar.
+    // We need to construct another point that lies on the mirror. Then four points determine the inversion sphere.
     
-    /* TODO: do we need 4D maths for this or can we stay in 3D somehow?
-    
-    // We project p1 onto the sphere stereographically, then reflect across the sphere center, then project back onto the plane.
-    // This gives us a third point on the inversion circle we want, so we can now compute the radius and center.
-    var stereographic_mirror_radius = c.w * 2.0; // stereographic projection is inversion in a sphere of twice the radius, centered at the north pole
-    var stereographic_mirror = { type:MirrorType.SPHERE, p:p3(c.x,c.y,stereographic_mirror_radius), r2:stereographic_mirror_radius*stereographic_mirror_radius }; 
+    // We reflect p across the sphere center, then project back onto the input volume.
+    // This gives us a second point on the inversion sphere we want, so we can fit a sphere and compute its radius.
+    var v = dist( pc, p );
+    var h = Math.sqrt( R*R - v*v );
+    var c  = { x:pc.x, y:pc.y, z:pc.z, w:h   }; // check: dist(c,p)==R
+    var sc = { x:pc.x, y:pc.y, z:pc.z, w:h+R };
+    var SR = 2.0 * R; // stereographic projection is inversion in a sphere of twice the radius
+    var stereographic_mirror = { type:MirrorType.SPHERE, p:sc, r2:SR*SR }; 
     var point_mirror = { type:MirrorType.POINT, p:c };
-    var p1_antipodal = reflect( reflect( reflect( p1, stereographic_mirror ), point_mirror ), stereographic_mirror );
-    // we now have four points on the sphere, what is its radius?
-    return sphere_radius( p1, p2, p3, p1_antipodal ); // need such a function!
-    */
+    var p_antipode_on_3sphere = { x:2.0*c.x-p.x, y:2.0*c.y-p.y, z:2.0*c.z-p.z, w:2.0*c.w };
+    var p_antipode_on_stereographic_volume = sphereInversion4d( p_antipode_on_3sphere, stereographic_mirror );
+    var p_antipodal = add( sc, mul( sub( p_antipode_on_stereographic_volume, sc ), ( h + R ) / ( R + R ) ) ); // scale back onto input plane (uses only the 3d coordinates)
+    // we now have a center line and two points for the sphere, what is its radius?
+    return sphere_radius_from_line_and_two_points( pc, c, p, p_antipodal );
 }
 
 function makeMirror1D( p, f ) {
@@ -210,24 +227,32 @@ function makeMirror2D( p1, p2, c, f ) {
 }
 
 function makeMirror3D( p, c, c2, f ) {
-    // given a vertex and the center of a face on a polyhedron with center c2
+    // given a vertex p and the center c of a face on a polyhedron with center c2
     // return a suitable Wythoff mirror for space curvature f
     if( Math.abs( f ) < 1e-4 ) {
         // f=0 : a flat mirror in the same plane as the face
         var n = normalize( sub( c, c2 ) );
         return { type:MirrorType.PLANE, p:c, n:n };
     }
-    else {
-        // positive *or* negative curvature: make an inversion sphere positioned to intersect the vertex
-        // (away from the face center if negative curvature, in from the face center if positive curvature)
+    else /* TODO: get this bit working so that our curvature values match the expected circumsphere radii for the polychora
+    if( f > 0.0 ) {
+        // positive curvature: make an inversion sphere positioned to intersect the vertices of the face, in towards the polyhedron center
+        var R = 1 / f;
+        // synthesise some extra points that could be vertices on the face
+        var r_stereo = getInversionRadiusForStereographicPolychoron( c2, c, p, R );
+        var n = normalize( sub( c, c2 ) );
+        var d = Math.sqrt( r_stereo*r_stereo - len2( sub( p, c ) ) );
+        var mc = sub( c, mul( n, d ) );
+        return { type:MirrorType.SPHERE, p:mc, r2:r_stereo*r_stereo };
+    }
+    else*/
+    {
+        // negative curvature: make an inversion sphere positioned to intersect the vertices, away from the polyhedron center
         var R = 1 / f;
         var n = normalize( sub( c, c2 ) );
         var d = Math.sqrt( R*R - len2( sub( p, c ) ) );
-        var mc;
-        if( f < 0 )
-            mc = add( c, mul( n, d ) );
-        else
-            mc = sub( c, mul( n, d ) );
+        var mc = add( c, mul( n, d ) );
+        if( f > 0.0 ) mc = sub( c, mul( n, d ) ); // temporary measure for now: use the same radius for positive curvature with stereographic projection
         return { type:MirrorType.SPHERE, p:mc, r2:R*R };
     }
 }
@@ -432,6 +457,12 @@ function init() {
 function sphereInversion( p, sphere ) {
     var d2 = len2( sub( p, sphere.p ) );
     return add( sphere.p, mul( sub( p, sphere.p ), sphere.r2 / d2 ) );
+}
+
+function sphereInversion4d( p, sphere ) {
+    var d2 = Math.pow( p.x - sphere.p.x, 2 ) + Math.pow( p.y - sphere.p.y, 2 ) + Math.pow( p.z - sphere.p.z, 2 ) + Math.pow( p.w - sphere.p.w, 2 );
+    var mf = sphere.r2 / d2;
+    return { x: sphere.p.x + mf*(p.x-sphere.p.x), y: sphere.p.y + mf*(p.y-sphere.p.y), z: sphere.p.z + mf*(p.z-sphere.p.z), w: sphere.p.w + mf*(p.w-sphere.p.w) };
 }
 
 function planeReflection( p, plane ) {
