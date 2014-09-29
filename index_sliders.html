@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <script>
 
-var MirrorType = { SPHERE:1, PLANE:2 };
+var MirrorType = { SPHERE:1, PLANE:2, POINT:3 };
 
 function p3( x, y, z ) { return { x:x, y:y, z:z }; }
 function p2( x, y ) { return { x:x, y:y }; }
@@ -17,9 +17,11 @@ function sub( a, b ) { return p3( a.x - b.x, a.y - b.y, a.z - b.z ); }
 function mul( a, f ) { return p3( a.x * f, a.y * f, a.z * f ); }
 function dot( a, b ) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 function len2( a ) { return dot(a,a); }
+function dist( a, b ) { return Math.sqrt( len2( sub( a, b ) ) ); }
 function assign( a, b ) { a.x = b.x; a.y = b.y; a.z = b.z; }
 function normalize( a ) { return mul( a, 1 / Math.sqrt( len2( a ) ) ); }
 function cross( a, b ) { return p3( a.y * b.z - a.z * b.y, a.z*b.x - a.x * b.z, a.x * b.y - a.y * b.x ); }
+function circle_radius( a, b, c ) { return a*b*c / Math.sqrt( (a+b+c)*(-a+b+c)*(a-b+c)*(a+b-c) ); } // triangle with side lengths a,b,c
 
 var depth;
 var mirror_lists;
@@ -55,11 +57,82 @@ function getMirrorLists( N, d ) {
 
 function reflect( p, mirror ) {
     switch( mirror.type ) {
-        case MirrorType.SPHERE:
-            return sphereInversion( p, mirror );
-        case MirrorType.PLANE:
-            return planeReflection( p, mirror );
+        case MirrorType.SPHERE: return sphereInversion( p, mirror );
+        case MirrorType.PLANE:  return planeReflection( p, mirror );
+        case MirrorType.POINT:  return pointReflection( p, mirror );
     }
+}
+
+function getInversionRadiusForStereographicPolygon( pc, p, R ) {
+    // If you've got a point p on the x-axis with midpoint pc that you want to use as a mirror to make a stereographic projection of
+    // a polygon in a second dimension, with radius R, what is the 1D projection of the inversion circle needed?
+    
+    // We need to construct another point that lies on the polygon mirror for that vertex. What is the mirror? 
+    // The vertex on the polygon's circumcircle defines a reflection across the line passing through that point 
+    // and the circle center. The only other point on the mirror is where the line intersects the circle on the other side.
+    
+    // One complication is that the point p is already on the circumcircle, not on the stereographic plane, and we want the answer in the
+    // same plane as the input. But changing planes is just a matter of linear scaling.
+    
+    var v = dist( pc, p );
+    var h = Math.sqrt( R*R - v*v );
+    var c = p3( pc.x, h, 0 ); // center of polygon circumcircle
+    var SR = 2.0 * R;
+    var sc = p3( pc.x, h+R, 0 ); // stereographic center is the north pole of the polygon circumcircle
+    var stereographic_mirror = { type:MirrorType.SPHERE, p:sc, r2:SR*SR }; 
+    var point_mirror = { type:MirrorType.POINT, p:c };
+    var p_antipodal = reflect( reflect( p, point_mirror ), stereographic_mirror );
+    // but p_antipodal lies on the stereographic plane - we need it on the input plane (linear scaling)
+    p_antipodal = add( sc, mul( sub( p_antipodal, sc ), (h+R) / (R+R) ) );
+    var r = dist( p, p_antipodal ) / 2.0;
+}
+
+function getInversionRadiusForStereographicPolyhedron( pc, p1, p2, R ) {
+    // If you've got an edge p1-p2 of a polygon with center pc on the xy-plane that you want to use as a mirror to make a 
+    // stereographic projection of a polyhedron in a third dimension, with radius R, what is the radius of the inversion circle needed?
+    
+    // We need to construct another point that lies on the mirror. What is the mirror? The edge on the polyhedron's circumsphere
+    // defines a reflection across the plane passing through the edge and the sphere's center. The intersection of this plane with
+    // the sphere is a great circle. Projecting that circle onto the stereographic plane gives the inversion circle we need.
+    
+    // There are lots of ways of working out what that circle is. One is to reflect one of the points across the sphere's center to the antipodal point
+    // and then project it back onto the plane.
+    
+    // One complication is that the point p1 is already on the circumcircle, not on the stereographic plane, and we want the answer in the
+    // same plane as the input. But changing planes is just a matter of linear scaling.
+    
+    // We reflect p1 across the sphere center, then project back onto the plane.
+    // This gives us a third point on the inversion circle we want, so we can now compute the radius and center.
+    var v = dist( pc, p1 );
+    var h = Math.sqrt( R*R - v*v );
+    var c  = p3( pc.x, pc.y, h ); // check: dist(c,p1)==dist(c,p2)==R
+    var sc = p3( pc.x, pc.y, h+R );
+    var SR = 2.0 * R; // stereographic projection is inversion in a sphere of twice the radius
+    var stereographic_mirror = { type:MirrorType.SPHERE, p:sc, r2:SR*SR }; 
+    var point_mirror = { type:MirrorType.POINT, p:c };
+    var p1_antipodal = reflect( reflect( p1, point_mirror ), stereographic_mirror );
+    p1_antipodal = add( sc, mul( sub( p1_antipodal, sc ), ( h + R ) / ( R + R ) ) ); // scale back onto input plane
+    // we now have three points on the circle, what is its radius?
+    return circle_radius( dist( p1, p2 ), dist( p2, p1_antipodal ), dist( p1_antipodal, p1 ) );
+}
+
+function getInversionRadiusForStereographicPolychoron( c, p1, p2, p3 ) {
+    // if you've got a planar polygon given by three points p1, p2 and p3 that you want to use as a mirror to make a stereographic
+    // projection of a polychoron in a fourth dimension, with center c, what is the inversion sphere needed
+    
+    // We need to construct another point that lies on the mirror. Then four points determine the inversion sphere, if not coplanar.
+    
+    /* TODO: do we need 4D maths for this or can we stay in 3D somehow?
+    
+    // We project p1 onto the sphere stereographically, then reflect across the sphere center, then project back onto the plane.
+    // This gives us a third point on the inversion circle we want, so we can now compute the radius and center.
+    var stereographic_mirror_radius = c.w * 2.0; // stereographic projection is inversion in a sphere of twice the radius, centered at the north pole
+    var stereographic_mirror = { type:MirrorType.SPHERE, p:p3(c.x,c.y,stereographic_mirror_radius), r2:stereographic_mirror_radius*stereographic_mirror_radius }; 
+    var point_mirror = { type:MirrorType.POINT, p:c };
+    var p1_antipodal = reflect( reflect( reflect( p1, stereographic_mirror ), point_mirror ), stereographic_mirror );
+    // we now have four points on the sphere, what is its radius?
+    return sphere_radius( p1, p2, p3, p1_antipodal ); // need such a function!
+    */
 }
 
 function makeMirror1D( p, f ) {
@@ -70,11 +143,21 @@ function makeMirror1D( p, f ) {
         return { type:MirrorType.PLANE, p:p, n:normalize(p) };
     }
     else if( f > 0 ) {
-        // positive curvature: can make a polygon by reflecting at an angle
         var R = 1 / f;
-        var c = p3( 0, Math.sqrt( R*R - len2(p) ), 0 );
-        var v = normalize( sub( p, c ) );
-        return { type:MirrorType.PLANE, p:c, n:p3(-v.y,v.x,0) };
+        var using_stereographic_projection = false;
+        if( using_stereographic_projection ) {
+            // positive curvature, stereographic line: make an inversion sphere positioned along the x-axis but inwards from the endpoint
+            var r_stereo = getInversionRadiusForStereographicPolygon( p3(0,0,0), p, R );
+            var n = normalize( p );
+            return { type:MirrorType.SPHERE, p:sub( p, mul( n, r_stereo ) ), r2:r_stereo*r_stereo };
+        }
+        else
+        {
+            // positive curvature: can make a polygon by reflecting at an angle
+            var c = p3( 0, Math.sqrt( R*R - len2(p) ), 0 );
+            var v = normalize( sub( p, c ) );
+            return { type:MirrorType.PLANE, p:c, n:p3(-v.y,v.x,0) };
+        }
     }
     else {
         // negative curvature, hyperbolic space: make an inversion sphere positioned further along the x-axis
@@ -85,7 +168,7 @@ function makeMirror1D( p, f ) {
 }
 
 function makeMirror2D( p1, p2, c, f ) {
-    // given two vertices of an edge of a polygon with center c
+    // given two vertices of an edge of a polygon on the xy-plane with center c
     // return a suitable Wythoff mirror for space curvature f
     if( Math.abs( f ) < 1e-4 ) {
         // f=0 : a flat mirror in the same plane
@@ -94,14 +177,26 @@ function makeMirror2D( p1, p2, c, f ) {
         return { type:MirrorType.PLANE, p:mid, n:n };
     }
     else if( f > 0 ) {
-        // positive curvature: can make a polyhedron by reflecting at an angle
-        var R = 1 / f;
-        var mid = mul( add( p1, p2 ), 0.5 );
-        var cn = normalize( cross( sub( p1, c ), sub( p2, c ) ) );
-        var cR = Math.sqrt( R*R - len2( sub( p1, c ) ) );
-        var c2 = add( c, mul( cn, cR ) );
-        var n = normalize( cross( sub( p1, c2 ), sub( p2, c2 ) ) );
-        return { type:MirrorType.PLANE, p:c2, n:n };
+        var R = 1 / f; // the radius of the polyhedron circumsphere
+        var using_stereographic_projection = false;
+        if( using_stereographic_projection ) {
+            // positive curvature, stereographic plane: make an inversion sphere positioned to intersect the two vertices (in from the edge)
+            var r_stereo = getInversionRadiusForStereographicPolyhedron( c, p1, p2, R );
+            var mid = mul( add( p1, p2 ), 0.5 );
+            var n = normalize( sub( mid, c ) );
+            var d = Math.sqrt( r_stereo*r_stereo - len2( sub( p1, mid ) ) );
+            var c2 = sub( mid, mul( n, d ) );
+            return { type:MirrorType.SPHERE, p:c2, r2:r_stereo*r_stereo };
+        }
+        else {
+            // positive curvature: can make a polyhedron by reflecting at an angle
+            var mid = mul( add( p1, p2 ), 0.5 );
+            var cn = normalize( cross( sub( p1, c ), sub( p2, c ) ) );
+            var cR = Math.sqrt( R*R - len2( sub( p1, c ) ) );
+            var c2 = add( c, mul( cn, cR ) );
+            var n = normalize( cross( sub( p1, c2 ), sub( p2, c2 ) ) );
+            return { type:MirrorType.PLANE, p:c2, n:n };
+        }
     }
     else {
         // negative curvature, hyperbolic space: make an inversion sphere positioned to intersect the two vertices (away from the center)
@@ -110,7 +205,6 @@ function makeMirror2D( p1, p2, c, f ) {
         var n = normalize( sub( mid, c ) );
         var d = Math.sqrt( R*R - len2( sub( p1, mid ) ) );
         var c2 = add( mid, mul( n, d ) );
-        //if( f > 0 ) c2 = sub( mid, mul( n, d ) ); // could use stereographic projection here to stay in 2D
         return { type:MirrorType.SPHERE, p:c2, r2:R*R };
     }
 }
@@ -346,6 +440,10 @@ function planeReflection( p, plane ) {
     return add( proj, sub( proj, p ) );
 }
 
+function pointReflection( p, point ) {
+    return add( point.p, sub( point.p, p ) );
+}
+
 function camera_projection( p, camera ) {
     var ray = sub( p, camera.p ); // the ray from camera center to point
     var cp = p3( dot( camera.x, ray ), dot( camera.y, ray ), dot( camera.z, ray ) ); // into camera space
@@ -430,35 +528,53 @@ function drawUI() {
         slider.handle_rect = { x:slider.x+slider.width*slider.value-handle_radius, y:slider.y, width:handle_radius*2+1, height:slider.height };
         drawRect( slider.handle_rect.x, slider.handle_rect.y, slider.handle_rect.width, slider.handle_rect.height );
     }
-    // draw the curvature text
+
+    // display some properties of this shape
     ctx.font="14px Arial";
     ctx.fillStyle="rgba(0,0,0,0.4)";
     ctx.textAlign = "left";
     ctx.textBaseline = "bottom";
+
     ctx.fillText("Curvature: "+curvatureFromSliderPos( sliders[0].value ).toFixed(3)+", "
                               +curvatureFromSliderPos( sliders[1].value ).toFixed(3)+", "
                               +curvatureFromSliderPos( sliders[2].value ).toFixed(3)+", "
                               ,20,canvas.height-20);
                               
-    // display some properties of this shape
     var f1 = curvatureFromSliderPos( sliders[0].value );
     var r1 = 1.0 / f1;
     var edge_length = 1.0; // fixed
     var v = edge_length / 2.0; // distance from center of edge to rotation point
     var m1 = Math.sqrt( r1*r1 - v*v ); // distance from polygon center to edge midpoint
-    var margin_angle1 = margin_angle( v, r1 ); // internal corner angle (e.g. 60 for a triangle)
-    var angle_defect1 = 180.0 - margin_angle1;
-    var schlafli1 = 360.0 / angle_defect1;
+    var corner_angle = margin_angle( v, r1 );
+    var exterior_angle = 180.0 - corner_angle;
+    var schlafli1 = 360.0 / exterior_angle; // proportion of number of sides to connection distance
+    // regular polygons are N/1 = N, star polygons are N/M (e.g. pentagram = 5/2 = 2.5 )
 
     var f2 = curvatureFromSliderPos( sliders[1].value );
     var r2 = 1.0 / f2;
-    var m2 = Math.sqrt( r2*r2 - v*v ); // distance from polyhedron center to edge midpoint
-    var margin_angle2 = margin_angle( m1, m2 * sign( r2 ) ); // dihedral angle
-
-    ctx.fillText("Corner angle: "+margin_angle1.toFixed(2)+"\xB0     Dihedral angle: "+margin_angle2.toFixed(2)+"\xB0",20,canvas.height-50);
-    ctx.fillText("Schlafli symbol: { "+schlafli1.toFixed(2)+", ? , ? }",20,canvas.height-80);
+    var m2 = Math.sqrt( r2*r2 - v*v ); // distance from polyhedron center to edge midpoint (if in 3D)
+    var dihedral_angle = margin_angle( m1, m2 * sign( r2 ) );
+    var theta; // what is the extra angle caused by the bulging in or out at a vertex?
+    if( Math.abs(f2) < 1e-4 ) {
+        theta = 0.0;
+    }
+    else if( r2 > 0.0 ) {
+        var r2_in_the_plane = getInversionRadiusForStereographicPolyhedron( p3( 0, m1, 0 ), p3(-v,0,0), p3(v,0,0), r2 );
+        theta = ( 180.0 / Math.PI ) * Math.asin( v / r2_in_the_plane );
+    }
+    else { 
+        theta = ( 180.0 / Math.PI ) * Math.asin( v / r2 );
+    }
+    var psi = corner_angle + 2.0 * theta; // psi is the new corner angle after bulging in or out
+    var schlafli2 = 360.0 / psi; // how many polygons will fit around a vertex?
     
-    // TODO: work out full Schlafli symbol, mark interesting places on the sliders
+    var info_text = "Corner angle when flat: "+corner_angle.toFixed(2)+"\xB0     Corner angle: "+psi.toFixed(2)+"\xB0";
+    if( r2 > 0.0 ) 
+        info_text += "     Dihedral angle when flat: "+dihedral_angle.toFixed(2)+"\xB0";
+    ctx.fillText( info_text, 20, canvas.height-50 );
+    ctx.fillText( "Schlafli symbol: { "+schlafli1.toFixed(2)+", "+schlafli2.toFixed(2)+ ", ? }",20,canvas.height-80);
+    
+    // TODO: work out third Schlafli symbol, mark interesting places on the sliders
     
     // interesting links:
     // http://en.wikipedia.org/wiki/Angular_defect
