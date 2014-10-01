@@ -45,6 +45,7 @@ var sliders;
 var iActiveSlider;
 var curvatureRange = 5;
 var isSpinning = true;
+var showStereographically = false;
 
 function curvatureFromSliderPos( v ) { return ( v - 0.5 ) * curvatureRange; }
 function sliderPosFromCurvature( f ) { return f / curvatureRange + 0.5; }
@@ -134,7 +135,7 @@ function getInversionRadiusForStereographicPolychoron( cc, c, p, R ) {
     // If you've got a polyhedron with center cc with a face, given by center c and a vertex p, that you want to use as a mirror to make a stereographic
     // projection of a polychoron in a fourth dimension, with radius R, what is the radius of the inversion sphere needed?
     
-    // We need to construct another point that lies on the mirror. Then two points and a line determine the inversion sphere.
+    // We need to construct another point that lies on the mirror (not on the polygon plane). Then two points and a line determine the inversion sphere.
     
     // We reflect p across the sphere center, then project back onto the input volume.
     // This gives us a second point on the inversion sphere we want, so we can fit a sphere and compute its radius.
@@ -194,8 +195,7 @@ function makeMirror2D( p1, p2, c, f ) {
     }
     else if( f > 0 ) {
         var R = 1 / f; // the radius of the polyhedron circumsphere
-        var using_stereographic_projection = false;
-        if( using_stereographic_projection ) {
+        if( showStereographically ) {
             // positive curvature, stereographic plane: make an inversion sphere positioned to intersect the two vertices (in from the edge)
             var r_stereo = getInversionRadiusForStereographicPolyhedron( c, p1, p2, R );
             var mid = mul( add( p1, p2 ), 0.5 );
@@ -533,11 +533,6 @@ function drawRect( x, y, w, h ) {
     ctx.stroke();
 }
 
-function margin_angle( v, r ) {
-    // for an N-polytope, if r is the distance 
-    return ( 180.0 / Math.PI ) * 2.0 * Math.acos( v / r );
-}
-
 function sign( x ) {
     return x?x<0?-1:1:0;
 }
@@ -557,30 +552,39 @@ function drawUI() {
     }
 
     // display some properties of this shape
+    
     ctx.font="14px Arial";
     ctx.fillStyle="rgba(0,0,0,0.4)";
     ctx.textAlign = "left";
     ctx.textBaseline = "bottom";
 
-    ctx.fillText("Curvature: "+curvatureFromSliderPos( sliders[0].value ).toFixed(3)+", "
-                              +curvatureFromSliderPos( sliders[1].value ).toFixed(3)+", "
-                              +curvatureFromSliderPos( sliders[2].value ).toFixed(3)+", "
-                              ,20,canvas.height-20);
-                              
     var f1 = curvatureFromSliderPos( sliders[0].value );
     var r1 = 1.0 / f1;
+    var f2 = curvatureFromSliderPos( sliders[1].value );
+    var r2 = 1.0 / f2;
+    var f3 = curvatureFromSliderPos( sliders[2].value );
+    var r3 = 1.0 / f3;
+
+    ctx.fillText( "Curvature: "+f1.toFixed(3)+", "+f2.toFixed(3)+", "+f3.toFixed(3)+", ", 20, canvas.height-20 );
+                              
+    var radii_text = "Polygon radius: "+r1.toFixed(3);
+    if( r2 > 0 ) 
+        radii_text += "     Polyhedron radius: "+r2.toFixed(3);
+    if( r3 > 0 ) 
+        radii_text += "     Polychoron radius: "+r3.toFixed(3);
+    radii_text += "     (edge length is 1)";    
+    ctx.fillText( radii_text, 20, canvas.height-50 );
+    
     var edge_length = 1.0; // fixed
     var v = edge_length / 2.0; // distance from center of edge to rotation point
     var m1 = Math.sqrt( r1*r1 - v*v ); // distance from polygon center to edge midpoint
-    var corner_angle = margin_angle( v, r1 );
+    var corner_angle = ( 180.0 / Math.PI ) * 2.0 * Math.acos( v / r1 );
     var exterior_angle = 180.0 - corner_angle;
     var schlafli1 = 360.0 / exterior_angle; // proportion of number of sides to connection distance
     // regular polygons are N/1 = N, star polygons are N/M (e.g. pentagram = 5/2 = 2.5 )
 
-    var f2 = curvatureFromSliderPos( sliders[1].value );
-    var r2 = 1.0 / f2;
     var m2 = Math.sqrt( r2*r2 - v*v ); // distance from polyhedron center to edge midpoint (if in 3D)
-    var dihedral_angle = margin_angle( m1, m2 * sign( r2 ) );
+    var dihedral_angle = ( 180.0 / Math.PI ) * 2.0 * Math.acos( m1 / m2 * sign( r2 ) );
     var theta; // what is the extra angle caused by the bulging in or out at a vertex?
     if( Math.abs(f2) < 1e-4 ) {
         theta = 0.0;
@@ -595,51 +599,44 @@ function drawUI() {
     var psi = corner_angle + 2.0 * theta; // psi is the new corner angle after bulging in or out
     var schlafli2 = 360.0 / psi; // how many polygons will fit around a vertex?
     
-    var f3 = curvatureFromSliderPos( sliders[2].value );
-    var r3 = 1.0 / f3;
-    var theta3; // what is the extra angle caused by the bulging in or out at a vertex?
+    var psi3; // what is the dihedral angle in the bulged polyhedra?
     if( Math.abs(f3) < 1e-4 ) {
-        theta3 = 0.0;
+        psi3 = dihedral_angle;
     }
     else if( r3 > 0.0 ) {
-        var h = Math.sqrt( m2*m2 - m1*m1 );
+        var h = Math.sqrt( m2*m2 - m1*m1 ); // height of the polyhedron center above the polygon face, check: h == Math.sqrt(r2*r2-r1*r1)
         var cc = p3(0,m1,h); // polyhedron center
         var c = p3(0,m1,0); // polygon center
         var p = p3(v,0,0); // a vertex
         var r3_stereo = getInversionRadiusForStereographicPolychoron( cc, c, p, r3 );
-        var r3_stereo_in_the_plane = Math.sqrt( r3_stereo*r3_stereo - v*v );
-        theta3 = ( 180.0 / Math.PI ) * Math.asin( m1 / r3_stereo_in_the_plane );
+        var pch = Math.sqrt( r3_stereo*r3_stereo - r1*r1 ); // height of the center of the inversion sphere above the polygon face
+        var q = pch - h; // distance from polyhedron center to inversion sphere center
+        var d = 2.0 * ( m1 * q / m2 ); // separation of inversion sphere centers, because triangle cc:c1:mp is similar to cc:(ccc1+ccc2)/2:ccc1
+        psi3 = ( 180.0 / Math.PI ) * 2.0 * Math.acos( d / ( 2.0 * r3_stereo ) );
     }
     else { 
         var h = Math.sqrt( m2*m2 - m1*m1 );
         var cc = p3(0,m1,h); // polyhedron center
         var c = p3(0,m1,0); // polygon center
         var p = p3(v,0,0); // a vertex
-        var r3_in_the_plane = Math.sqrt( r3*r3 - v*v );
-        theta3 = ( 180.0 / Math.PI ) * Math.asin( m1 / r3_in_the_plane );
+        var mp = p3(0,0,0);
+        var pch = -Math.sqrt( r3*r3 - r1*r1 ); // height of the center of the inversion sphere above the polygon face
+        var q = pch - h; // distance from polyhedron center to inversion sphere center
+        var d = 2.0 * ( m1 * q / m2 ); // separation of inversion sphere centers, because triangle cc:c1:mp is similar to cc:(ccc1+ccc2)/2:ccc1
+        psi3 = ( 180.0 / Math.PI ) * 2.0 * Math.acos( d / ( 2.0 * r3 ) );
     }
-    var psi3 = dihedral_angle + 2.0 * theta3; // psi3 is the new dihedral angle after bulging in or out
     var schlafli3 = 360.0 / psi3; // how many polyhedra will fit around each edge?
-    // but this doesn't work - why?
     
     var angles_text = "Corner angle when flat: "+corner_angle.toFixed(2)+"\xB0     Corner angle: "+psi.toFixed(2)+"\xB0";
-    if( r2 > 0.0 ) 
+    if( r2 > 0.0 ) {
         angles_text += "     Dihedral angle when flat: "+dihedral_angle.toFixed(2)+"\xB0";
-    //if( r3 > 0.0 ) 
-    //    angles_text += "     Dihedral angle: "+psi3.toFixed(2)+"\xB0";
-    ctx.fillText( angles_text, 20, canvas.height-50 );
+        angles_text += "     Dihedral angle: "+psi3.toFixed(2)+"\xB0";
+    }
+    ctx.fillText( angles_text, 20, canvas.height-80 );
     
-    ctx.fillText( "Schlafli symbol: { "+schlafli1.toFixed(2)+", "+schlafli2.toFixed(2)+ ", ? }",20,canvas.height-80);
+    ctx.fillText( "Schlafli symbol: { "+schlafli1.toFixed(2)+", "+schlafli2.toFixed(2)+ ", "+schlafli3.toFixed(2)+ " }",20,canvas.height-110);
     
-    var radii_text = "Polygon radius: "+r1.toFixed(3);
-    if( r2 > 0 ) 
-        radii_text += "     Polyhedron radius: "+r2.toFixed(3);
-    if( r3 > 0 ) 
-        radii_text += "     Polychoron radius: "+r3.toFixed(3);
-    radii_text += "     (edge length is 1)";    
-    ctx.fillText( radii_text, 20, canvas.height-110 );
-    
-    // TODO: find third Schlafli symbol, mark interesting places on the sliders
+    // TODO: mark interesting places on the sliders
     
     // interesting links:
     // http://en.wikipedia.org/wiki/Angular_defect
