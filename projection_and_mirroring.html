@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script>
+
+var MirrorType = { SPHERE:1, PLANE:2, POINT:3 };
+
+function p3( x, y, z ) { return { x:x, y:y, z:z }; }
+function p2( x, y ) { return { x:x, y:y }; }
+function add( a, b ) { return p3( a.x + b.x, a.y + b.y, a.z + b.z ); }
+function sub( a, b ) { return p3( a.x - b.x, a.y - b.y, a.z - b.z ); }
+function mul( a, f ) { return p3( a.x * f, a.y * f, a.z * f ); }
+function dot( a, b ) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+function len2( a ) { return dot(a,a); }
+function dist( a, b ) { return Math.sqrt( len2( sub( a, b ) ) ); }
+function assign( a, b ) { a.x = b.x; a.y = b.y; a.z = b.z; }
+function normalize( a ) { return mul( a, 1 / Math.sqrt( len2( a ) ) ); }
+function cross( a, b ) { return p3( a.y * b.z - a.z * b.y, a.z*b.x - a.x * b.z, a.x * b.y - a.y * b.x ); }
+function circle_radius( a, b, c ) { return a*b*c / Math.sqrt( (a+b+c)*(-a+b+c)*(a-b+c)*(a+b-c) ); } // triangle with side lengths a,b,c
+
+var canvas;
+var ctx;
+var f;
+var scale;
+var translate;
+
+function reflect( p, mirror ) {
+    switch( mirror.type ) {
+        case MirrorType.SPHERE:
+            return sphereInversion( p, mirror );
+        case MirrorType.PLANE:
+            return planeReflection( p, mirror );
+        case MirrorType.POINT:
+            return pointReflection( p, mirror );
+    }
+}
+
+function getMousePos(canvas, evt) {
+    var rect = canvas.getBoundingClientRect();
+    return p2( evt.clientX - rect.left, evt.clientY - rect.top );
+}
+
+function onMouseMove( evt ) {
+    var pos = getMousePos( canvas, evt );
+    f = ( pos.x - canvas.width/2 ) * 0.5;
+    redraw();
+}
+
+function init() {
+    canvas = document.getElementById('canvas');
+    ctx = canvas.getContext('2d');
+
+    f = 1.0;
+    scale = 100.0;
+    translate = p3( canvas.width/2, canvas.height/2, 0 );
+    redraw();
+
+    canvas.addEventListener( 'mousemove', onMouseMove, false );
+}
+
+function sphereInversion( p, sphere ) {
+    var d2 = len2( sub( p, sphere.p ) );
+    return add( sphere.p, mul( sub( p, sphere.p ), sphere.r2 / d2 ) );
+}
+
+function planeReflection( p, plane ) {
+    var pn = dot( plane.n, sub( p, plane.p ) );
+    var proj = sub( p, mul( plane.n, pn ) );
+    return add( proj, sub( proj, p ) );
+}
+
+function pointReflection( p, point ) {
+    return add( point.p, sub( point.p, p ) );
+}
+
+function fromHyperbola( p ) {
+    // for the unit hyperbola a=b=1 centered at the origin
+    return p3( p.x / ( 1.0 + p.y ), 0, 0 );
+}
+
+function toHyperbola( p ) {
+    // for the unit hyperbola a=b=1 centered at the origin
+    return p3( 2.0*p.x/(1.0-p.x*p.x), -(1.0+p.x*p.x)/(1.0-p.x*p.x), 0 );
+}
+
+function toOurHyperbola( p, o, R ) {
+    // p should lie on the x-axis
+    var s = sub( p, o );
+    var x = 0.5 * s.x / R;
+    var a = toHyperbola( p3( x, 0, 0 ) );
+    a = mul( a, R );
+    return add( a, o );
+}
+
+function line( a, b ) { 
+    ctx.beginPath();
+    ctx.moveTo( a.x*scale + translate.x, translate.y - a.y*scale ); 
+    ctx.lineTo( b.x*scale + translate.x, translate.y - b.y*scale  ); 
+    ctx.stroke();
+}
+function circle( c, R ) { ctx.beginPath(); ctx.arc( c.x*scale + translate.x, translate.y - c.y*scale, Math.abs(R)*scale, 0, 2.0 * Math.PI ); ctx.stroke(); }
+function point( p, t ) { 
+    ctx.beginPath(); 
+    ctx.arc( p.x*scale + translate.x, translate.y - p.y*scale, 2, 0, 2.0 * Math.PI ); 
+    if( t )
+        ctx.fillText( t, p.x*scale + translate.x + 3, translate.y - p.y*scale - 3 );
+    ctx.fill(); 
+}
+
+function redraw() {
+    var thinLineStyle = "rgba(0,0,0,0.3)";
+    var redLineStyle = "rgb(255,0,0)";
+    var blueLineStyle = "rgb(0,127,255)";
+    var brownLineStyle = "rgba(127,60,0,0.3)";
+    
+    ctx.strokeStyle = thinLineStyle;
+    ctx.font="12px Verdana";
+    
+    ctx.clearRect( 0, 0, canvas.width, canvas.height );
+    ctx.strokeRect( 0, 0, canvas.width, canvas.height );
+    
+    // draw the base line
+    line( p3(-100,0,0), p3(100,0,0) );
+    ctx.beginPath();
+    ctx.fillText( 'input plane', 10, translate.y - 3 );
+
+    var R = 1.0 / f;
+    R *= 20;
+    
+    var c = p3(0,0,0);
+    point( c, 'C' );
+    var a = p3(1,0,0);
+    point( a, 'A' );
+
+    // construct a circle where things live sometimes oh heck it must have a name
+    var o = p3(0,R,0);
+    point( o, 'O' );
+    if( R > 0 )
+        ctx.strokeStyle = brownLineStyle; // for positive curvature this circle is our home surface
+    circle( o, R );
+    ctx.strokeStyle = thinLineStyle;
+    
+    // construct the inversion circle that we can use to project stereographically to and from the circle
+    var SR = 2.0 * R;
+    var s = p3( 0, SR, 0 );
+    var inversion = { type:MirrorType.SPHERE, p:s, r2:SR*SR };
+    //circle( s, SR );
+    point( s, 'S' );
+
+    var b = reflect( a, inversion );
+    point( b, 'B' );
+    line( s, a );
+      
+    if( R > 0 ) {
+        // construct other points on the mirror using the geodesic on the sphere
+        var d = add( o, sub( o, b ) );
+        
+        ctx.strokeStyle = redLineStyle;
+        line( c, b );
+    }
+    else {
+        var w = p3(-2*R,0,0); 
+        var e = p3(2*R,0,0); 
+        point( w,'W');
+        point( e,'E');
+        line( e, w );
+        line( s, e );
+        line( s, w );
+
+        // draw the hyperbola itself
+        var step = 0.01;
+        ctx.strokeStyle = brownLineStyle;
+        for( var x = -1+step; x <= 1-step; x+=step ) {
+            var e1 = toHyperbola( p3( x-step/2,0,0) );
+            var e2 = toHyperbola( p3( x+step/2,0,0) );
+            e1 = mul( e1, R );
+            e2 = mul( e2, R );
+            var pe1 = p3( e1.x, -e1.y, e1.z );
+            var pe2 = p3( e2.x, -e2.y, e2.z );
+            line( add( e1, o ), add( e2, o ) );
+            line( add( pe1, o ), add( pe2, o ) );
+        }
+        ctx.strokeStyle = thinLineStyle;
+        line( p3(o.x-R,o.y,o.z), p3(o.x+R,o.y,o.z) ); // the Klein plane
+        
+        var h = toOurHyperbola( a, o, R );
+        point( h, 'H' );
+        line( a, h );
+        
+        // draw the plane through that point and the origin that makes a geodesic on the hyperbola
+        line( o, add( o, mul( sub( h, o ), 100 ) ) );
+        
+        // construct other points on the mirror using the geodesic on the hemisphere model
+        var d = p3( b.x, o.y + o.y - b.y, b.z );
+        
+        ctx.strokeStyle = redLineStyle;
+        line( c, h );
+    }
+    
+    // draw the other side of the mirror and its projection
+    ctx.strokeStyle = thinLineStyle;
+    line( b, d );
+    point( d, 'D' );
+    var m = reflect( d, inversion );
+    line( s, m );
+    point( m, 'M' );
+    
+    ctx.strokeStyle = redLineStyle;
+    line( c, a );
+    
+    // construct the inversion circle for the mirror at a, and reflect c onto g
+    var k = mul( add( a, m ), 0.5 ); // center of the inversion sphere
+    var mirror = { type:MirrorType.SPHERE, p:k, r2:Math.pow( dist( a, k ), 2 ) };
+    point( k, 'K' );
+    var g = reflect( c, mirror );
+    ctx.strokeStyle = blueLineStyle;
+    line( a, g );
+    point( g, 'G' );
+    // project g onto the surface
+    if( R > 0 ) {
+        var gp = reflect( g, inversion );
+        line( b, gp );
+        ctx.strokeStyle = thinLineStyle;
+        line( g, s );
+    }
+    else {
+        var gp = toOurHyperbola( g, o, R );
+        line( h, gp );
+        ctx.strokeStyle = thinLineStyle;
+        line( gp, s );
+    }
+}
+
+window.onload = init;
+</script>
+
+<noscript>
+<p>For full functionality of this site it is necessary to enable JavaScript.
+Here are the <a href="http://www.enable-javascript.com/" target="_blank">
+instructions how to enable JavaScript in your web browser</a>.
+</p></noscript>
+
+</head>
+
+<body>
+
+<p align="center"><canvas id="canvas" width="1000" height="700">(Canvas drawing not supported by your browser.)</canvas></p>
+
+</html>
+
