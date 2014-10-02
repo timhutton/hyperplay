@@ -110,11 +110,15 @@ function point( p, t ) {
 
 function redraw() {
     var thinLineStyle = "rgba(0,0,0,0.3)";
+    var homeLineStyle = "rgba(180,180,0,1)";
     var redLineStyle = "rgb(255,0,0)";
     var blueLineStyle = "rgb(0,127,255)";
-    var brownLineStyle = "rgba(127,60,0,0.3)";
+    var greenLineStyle = "rgb(0,127,0)";
+    var pinkLineStyle = "rgb(255,127,127)";
+    var cyanLineStyle = "rgb(0,255,255)";
     
     ctx.strokeStyle = thinLineStyle;
+    ctx.lineWidth = 1;
     ctx.font="12px Verdana";
     
     ctx.clearRect( 0, 0, canvas.width, canvas.height );
@@ -126,18 +130,18 @@ function redraw() {
     ctx.fillText( 'input plane', 10, translate.y - 3 );
 
     var R = 1.0 / f;
-    R *= 20;
+    R *= 100;
     
     var c = p3(0,0,0);
     point( c, 'C' );
-    var a = p3(1,0,0);
+    var a = p3(0.7,0,0);
     point( a, 'A' );
 
     // construct a circle where things live sometimes oh heck it must have a name
     var o = p3(0,R,0);
     point( o, 'O' );
     if( R > 0 )
-        ctx.strokeStyle = brownLineStyle; // for positive curvature this circle is our home surface
+        ctx.strokeStyle = homeLineStyle; // for positive curvature this circle is our home surface
     circle( o, R );
     ctx.strokeStyle = thinLineStyle;
     
@@ -151,7 +155,10 @@ function redraw() {
     var b = reflect( a, inversion );
     point( b, 'B' );
     line( s, a );
+    
+    var central_mirror = { type:MirrorType.PLANE, p:c, n:p3(1,0,0) };
       
+    var h;
     if( R > 0 ) {
         // construct other points on the mirror using the geodesic on the sphere
         var d = add( o, sub( o, b ) );
@@ -164,13 +171,12 @@ function redraw() {
         var e = p3(2*R,0,0); 
         point( w,'W');
         point( e,'E');
-        line( e, w );
         line( s, e );
         line( s, w );
 
         // draw the hyperbola itself
         var step = 0.01;
-        ctx.strokeStyle = brownLineStyle;
+        ctx.strokeStyle = homeLineStyle;
         for( var x = -1+step; x <= 1-step; x+=step ) {
             var e1 = toHyperbola( p3( x-step/2,0,0) );
             var e2 = toHyperbola( p3( x+step/2,0,0) );
@@ -184,7 +190,7 @@ function redraw() {
         ctx.strokeStyle = thinLineStyle;
         line( p3(o.x-R,o.y,o.z), p3(o.x+R,o.y,o.z) ); // the Klein plane
         
-        var h = toOurHyperbola( a, o, R );
+        h = toOurHyperbola( a, o, R );
         point( h, 'H' );
         line( a, h );
         
@@ -195,10 +201,12 @@ function redraw() {
         var d = p3( b.x, o.y + o.y - b.y, b.z );
         
         ctx.strokeStyle = redLineStyle;
+        ctx.lineWidth = 2;
         line( c, h );
     }
     
     // draw the other side of the mirror and its projection
+    ctx.lineWidth = 1;
     ctx.strokeStyle = thinLineStyle;
     line( b, d );
     point( d, 'D' );
@@ -207,29 +215,73 @@ function redraw() {
     point( m, 'M' );
     
     ctx.strokeStyle = redLineStyle;
+    ctx.lineWidth = 2;
     line( c, a );
     
     // construct the inversion circle for the mirror at a, and reflect c onto g
     var k = mul( add( a, m ), 0.5 ); // center of the inversion sphere
     var mirror = { type:MirrorType.SPHERE, p:k, r2:Math.pow( dist( a, k ), 2 ) };
-    point( k, 'K' );
+    point( k );
     var g = reflect( c, mirror );
     ctx.strokeStyle = blueLineStyle;
+    ctx.lineWidth = 2;
     line( a, g );
     point( g, 'G' );
-    // project g onto the surface
+    var u = reflect( a, central_mirror );
+    var v = reflect( g, central_mirror );
+    var w = reflect( u, mirror );
+    var y = reflect( w, central_mirror );
+    ctx.strokeStyle = greenLineStyle;
+    line( c, u );
+    ctx.strokeStyle = pinkLineStyle;
+    line( u, v );
+    line( g, w );
+    ctx.strokeStyle = cyanLineStyle;
+    line( v, y );
+    // project points onto the surface
+    var gp,vp,up,wp;
     if( R > 0 ) {
-        var gp = reflect( g, inversion );
-        line( b, gp );
+        gp = reflect( g, inversion );
+        up = reflect( u, inversion );
+        vp = reflect( v, inversion );
+        wp = reflect( w, inversion );
+        yp = reflect( y, inversion );
         ctx.strokeStyle = thinLineStyle;
+        ctx.lineWidth = 1;
         line( g, s );
     }
     else {
-        var gp = toOurHyperbola( g, o, R );
-        line( h, gp );
+        gp = toOurHyperbola( g, o, R );
+        up = toOurHyperbola( u, o, R );
+        vp = toOurHyperbola( v, o, R );
+        wp = toOurHyperbola( w, o, R );
+        yp = toOurHyperbola( y, o, R );
         ctx.strokeStyle = thinLineStyle;
+        ctx.lineWidth = 1;
         line( gp, s );
     }
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = blueLineStyle;
+    if( R < 0.0 ) {
+        line( h, gp );
+    }
+    else {
+        line( b, gp );
+    }
+    ctx.strokeStyle = greenLineStyle;
+    line( c, up );
+    ctx.strokeStyle = pinkLineStyle;
+    line( up, vp );
+    line( gp, wp );
+    ctx.strokeStyle = cyanLineStyle;
+    line( vp, yp );
+    
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = thinLineStyle;
+    line( u, up );
+    line( v, vp );
+    line( w, wp );
+    line( y, yp );
 }
 
 window.onload = init;
