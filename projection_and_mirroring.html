@@ -158,19 +158,15 @@ function redraw() {
 
     var central_mirror = { type:MirrorType.PLANE, p:c, n:p3(1,0,0) };
       
-    var b;
+    var b,d,m;
     if( R > 0 ) {
         b = reflect( a, inversion );
         // construct other points on the mirror using the geodesic on the sphere
-        var d = add( o, sub( o, b ) );
-        var m = reflect( d, inversion );
+        d = add( o, sub( o, b ) );
+        m = reflect( d, inversion );
         
         line( s, m );
         line( a, s );
-
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = lightGreenLineStyle;
-        line( b, d );
     }
     else {
         var w = p3(-2*R,0,0); 
@@ -198,22 +194,20 @@ function redraw() {
         
         b = toOurHyperbola( a, o, R );
         
-        // draw the plane through that point and the origin that makes a geodesic on the hyperbola
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = lightGreenLineStyle;
-        line( sub( o, mul( sub( b, o ), 100 ) ), add( o, mul( sub( b, o ), 100 ) ) );
-        
         // construct other points on the mirror using the geodesic on the hemisphere model
-        var d = add( o, sub( o, b ) );
-        var m = fromOurHyperbola( d, o, R );
+        d = add( o, sub( o, b ) );
+        m = fromOurHyperbola( d, o, R );
         
         ctx.lineWidth = 1;
         ctx.strokeStyle = thinLineStyle;
-        line( c, b );
         line( b, s );
         line( d, m );
     }
     
+    // draw the plane through that point and the origin that makes a geodesic on the hyperbola
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = lightGreenLineStyle;
+    line( sub( o, mul( sub( b, o ), 100 ) ), add( o, mul( sub( b, o ), 100 ) ) ); // B-O-D
     point( b, 'B' );
     
     // draw the other side of the mirror and its projection
