@@ -171,9 +171,6 @@ function redraw() {
         ctx.lineWidth = 1;
         ctx.strokeStyle = lightGreenLineStyle;
         line( b, d );
-
-        ctx.strokeStyle = redLineStyle;
-        line( c, b );
     }
     else {
         var w = p3(-2*R,0,0); 
@@ -228,6 +225,7 @@ function redraw() {
     ctx.strokeStyle = redLineStyle;
     ctx.lineWidth = 2;
     line( c, a );
+    line( b, c );
     
     // construct the inversion circle for the mirror at a, and reflect c onto g
     var k = mul( add( a, m ), 0.5 ); // center of the inversion sphere
