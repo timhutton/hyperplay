@@ -119,6 +119,7 @@ function redraw() {
     var redLineStyle = "rgb(255,0,0)";
     var blueLineStyle = "rgb(0,127,255)";
     var greenLineStyle = "rgb(0,127,0)";
+    var lightGreenLineStyle = "rgba(0,255,0,0.5)";
     var pinkLineStyle = "rgb(255,127,127)";
     var cyanLineStyle = "rgb(0,255,255)";
     
@@ -164,9 +165,12 @@ function redraw() {
         var d = add( o, sub( o, b ) );
         var m = reflect( d, inversion );
         
-        line( b, d );
         line( s, m );
         line( a, s );
+
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = lightGreenLineStyle;
+        line( b, d );
 
         ctx.strokeStyle = redLineStyle;
         line( c, b );
@@ -198,14 +202,16 @@ function redraw() {
         b = toOurHyperbola( a, o, R );
         
         // draw the plane through that point and the origin that makes a geodesic on the hyperbola
-        line( o, add( o, mul( sub( b, o ), 100 ) ) );
-        // extend the same line in the opposite direction
-        line( o, sub( o, mul( sub( b, o ), 100 ) ) );
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = lightGreenLineStyle;
+        line( sub( o, mul( sub( b, o ), 100 ) ), add( o, mul( sub( b, o ), 100 ) ) );
         
         // construct other points on the mirror using the geodesic on the hemisphere model
         var d = add( o, sub( o, b ) );
         var m = fromOurHyperbola( d, o, R );
         
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = thinLineStyle;
         line( c, b );
         line( b, s );
         line( d, m );
