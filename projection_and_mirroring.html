@@ -98,10 +98,12 @@ function fromOurHyperbola( p, o, R ) {
     return p3( 2.0 * R * ap.x, 0, 0 );
 }
 
+function moveTo( a ) { ctx.moveTo( a.x*scale + translate.x, translate.y - a.y*scale ); }
+function lineTo( a ) { ctx.lineTo( a.x*scale + translate.x, translate.y - a.y*scale ); }
 function line( a, b ) { 
     ctx.beginPath();
-    ctx.moveTo( a.x*scale + translate.x, translate.y - a.y*scale ); 
-    ctx.lineTo( b.x*scale + translate.x, translate.y - b.y*scale  ); 
+    moveTo( a );
+    lineTo( b );
     ctx.stroke();
 }
 function circle( c, R ) { ctx.beginPath(); ctx.arc( c.x*scale + translate.x, translate.y - c.y*scale, Math.abs(R)*scale, 0, 2.0 * Math.PI ); ctx.stroke(); }
@@ -114,8 +116,10 @@ function point( p, t ) {
 }
 
 function redraw() {
+    var blackFillStyle = "rgb(0,0,0)";
     var thinLineStyle = "rgba(0,0,0,0.3)";
     var homeLineStyle = "rgba(180,180,0,1)";
+    var homeFillStyle = "rgba(180,180,0,0.05)";
     var redLineStyle = "rgb(255,0,0)";
     var blueLineStyle = "rgb(0,127,255)";
     var greenLineStyle = "rgb(0,127,0)";
@@ -147,7 +151,12 @@ function redraw() {
     if( R > 0 )
         ctx.strokeStyle = homeLineStyle; // for positive curvature this circle is our home surface
     circle( o, R );
-    ctx.strokeStyle = thinLineStyle;
+    if( R > 0 ) {
+        ctx.fillStyle = homeFillStyle;
+        ctx.fill();
+        ctx.fillStyle = blackFillStyle;
+        ctx.strokeStyle = thinLineStyle;
+    }
     
     // construct the inversion circle that we can use to project stereographically to and from the circle
     var SR = 2.0 * R;
@@ -178,17 +187,35 @@ function redraw() {
 
         // draw the hyperbola itself
         var step = 0.01;
+        ctx.fillStyle = homeFillStyle;
         ctx.strokeStyle = homeLineStyle;
-        for( var x = -1+step; x <= 1-step; x+=step ) {
-            var e1 = toHyperbola( p3( x-step/2,0,0) );
+        ctx.beginPath();
+        var x = -1+step;
+        var e1 = toHyperbola( p3( x-step/2,0,0) );
+        e1 = mul( e1, R );
+        moveTo( e1 );
+        for( ; x <= 1-step; x+=step ) {
             var e2 = toHyperbola( p3( x+step/2,0,0) );
-            e1 = mul( e1, R );
             e2 = mul( e2, R );
-            var pe1 = p3( e1.x, -e1.y, e1.z );
-            var pe2 = p3( e2.x, -e2.y, e2.z );
-            line( add( e1, o ), add( e2, o ) );
-            line( add( pe1, o ), add( pe2, o ) );
+            lineTo( add( e2, o ) );
         }
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        x = -1+step;
+        e1 = toHyperbola( p3( x-step/2,0,0) );
+        e1 = mul( e1, R );
+        e1 = p3( e1.x, -e1.y, e1.z );
+        moveTo( e1 );
+        for( ; x <= 1-step; x+=step ) {
+            var e2 = toHyperbola( p3( x+step/2,0,0) );
+            e2 = mul( e2, R );
+            e2 = p3( e2.x, -e2.y, e2.z );
+            lineTo( add( e2, o ) );
+        }
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = blackFillStyle;
         ctx.strokeStyle = thinLineStyle;
         line( p3(o.x-R,o.y,o.z), p3(o.x+R,o.y,o.z) ); // the Klein plane
         
