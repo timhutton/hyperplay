@@ -49,7 +49,7 @@ function init() {
     canvas = document.getElementById('canvas');
     ctx = canvas.getContext('2d');
 
-    scale = 50.0;
+    scale = 30.0;
     translate = p3( canvas.width/2, canvas.height/2, 0 );
     redraw();
 
@@ -129,7 +129,7 @@ function reciprocal_of_point( C, p ) {
 
 function redraw() {
 
-    ctx.strokeStyle = "rgba(0,0,0,0.3)";
+    ctx.strokeStyle = "rgba(0,0,0,0.5)";
 
     ctx.clearRect( 0, 0, canvas.width, canvas.height );
     ctx.strokeRect( 0, 0, canvas.width, canvas.height );
@@ -141,13 +141,14 @@ function redraw() {
     point( C.p );
     
     // find the pole of each tangent of a circle
-    var r = 1;
+    var r = 2;
     var wmp = mul(sub(mp,translate),1.0/scale);
     wmp.y *= -1;
     var C2 = { type:MirrorType.SPHERE, p:wmp, r2:r*r };
     circle( C2.p, r );
-    var step = 2.0 * Math.PI / 100.0;
-    for( var i = 0; i < 100; ++i ) {
+    var N = 300;
+    var step = 2.0 * Math.PI / N;
+    for( var i = 0; i < N; ++i ) {
         var theta = i * step; 
 
         // find the point on the circle and its normal, defining a tangent
@@ -162,12 +163,12 @@ function redraw() {
         point( RP );
         
         // for fun also draw the inversion of the same point on C2
-        ctx.fillStyle = "rgba(255,0,0,0.2)";
+        ctx.fillStyle = "rgba(255,0,0,0.4)";
         var IP = sphereInversion( p, C );
         point( IP );
 
         // also draw the inversion of RP
-        ctx.fillStyle = "rgba(0,0,255,0.2)";
+        ctx.fillStyle = "rgba(0,0,255,0.4)";
         var TP = sphereInversion( RP, C );
         point( TP );
         
