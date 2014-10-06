@@ -49,7 +49,7 @@ function init() {
     canvas = document.getElementById('canvas');
     ctx = canvas.getContext('2d');
 
-    scale = 30.0;
+    scale = 100.0;
     translate = p3( canvas.width/2, canvas.height/2, 0 );
     redraw();
 
@@ -135,13 +135,13 @@ function redraw() {
     ctx.strokeRect( 0, 0, canvas.width, canvas.height );
    
     // define our circle of reciprocation
-    var r1 = 2;
+    var r1 = 1;
     var C = { type:MirrorType.SPHERE, p:p3(0,0,0), r2:r1*r1 };
     circle( C.p, Math.sqrt(C.r2) );
     point( C.p );
     
     // find the pole of each tangent of a circle
-    var r = 2;
+    var r = 0.5;
     var wmp = mul(sub(mp,translate),1.0/scale);
     wmp.y *= -1;
     var C2 = { type:MirrorType.SPHERE, p:wmp, r2:r*r };
