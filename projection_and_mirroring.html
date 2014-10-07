@@ -271,19 +271,20 @@ instructions how to enable JavaScript in your web browser</a>.
 
 <p>So we want to make a tiling. We're going to use Wythoff construction, where we put down a single tile and then repeatedly reflect it in its edges.<p>
 
-<p>The red line between C and B is our first tile. The first edge, at C, is easy to make a mirror for: the scene is already symmetric around this point 
-so we simply reflect across it. The second edge of the tile, at B, is more tricky.</p>
+<p>The red line between C and A is our first tile. The first edge, at C, is easy to make a mirror for: the scene is already symmetric around this point 
+so we simply reflect across it. The second edge of the tile, at A, is more tricky.</p>
 
-<p>The light green line shows the geodesic of edge B - the plane that passes through the edge and the origin O. All points on this geodesic will be unaffected
-by the mirroring. In our 1D example the only other such point is D but in 2D there will be a whole circle of such points, and likewise a whole sphere in 3D.</p>
+<p>We project edge A onto our curved surface, to B. The light green line shows the geodesic of B - the plane that passes through the edge at B and the origin at O. 
+All points on this geodesic will be unaffected by the mirroring. In our 1D example the only other such point is D but in 2D there will be a whole circle of such 
+points, and likewise a whole sphere in 3D.</p>
 
-<p>The points B and D project onto the stereographic plane at A and M. They define a circle of inversion in the stereographic plane that we can use to reflect
-the tile. It has its center at point K that in this 1D case is halfway between them.</p>
+<p>Point D projects onto the stereographic plane at M. Point A and M define a circle of inversion in the stereographic plane that we can use to reflect
+the tile. It has its center at point K that in this 1D case is halfway between A and M.</p>
 
 <p>We can then reflect the red tile C-A using the circle of inversion A-K-M. This leaves A where it is and puts C onto point G, 
 making our new tile A-G, drawn in blue.</p>
 
-<p>Reflecting tile A-C in C gives the dark green tile. Reflecting the dark green tile over A gives the pink tile on the other side of G, and so on.</p>
+<p>Reflecting the original tile C-A in C gives the dark green tile. Reflecting the dark green tile over A gives the pink tile on the other side of G, and so on.</p>
 
 <p>In 2D and 3D the process is the same - the tile is reflected in the circle (or sphere) of inversion defined by each of its facets. For certain values
 of curvature the tiles all line up and we get a regular tiling of the hyperbolic plane or of the sphere. In the spherical case we call this a polyhedron or a polychoron.</p>
