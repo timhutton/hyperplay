@@ -141,7 +141,7 @@ Now the stereographic projection takes us to and from a hyperbola. This is one w
 
 <p align="center"><canvas id="canvas" width="1000" height="700">(Canvas drawing not supported by your browser.)</canvas></p>
 
-<p>Stereographic projection, with respect to a center C and radius R:</p>
+<p>Stereographic projection of a point p, with respect to a center C and radius R:</p>
 
 <tt><p>s( p, C, R ) = c + (p-c) * R^2 / dist2( p, c )</p></tt>
 
@@ -153,7 +153,7 @@ Now the stereographic projection takes us to and from a hyperbola. This is one w
 <p>For the hyperbola projection, with metric signature (+,-):</p>
 <tt><p>dist2( a, b ) = ( a.x - b.x )^2 - ( a.y - b.y )^2</p></tt>
 
-<p>In general we specify the metric tensor as e.g. [ m1, m2, m3 ] = [ 1, 1, -1 ] and the generalized squared-distance function becomes (in three dimensions):</p>
+<p>In general we specify the metric tensor as e.g. [ m1, m2, m3 ] = [ 1, 1, -1 ] for ( +, +, - ) and the generalized squared-distance function becomes (in three dimensions):</p>
 <tt><p>dist2( a, b ) = m1 * ( a.x - b.x )^2 + m2 * ( a.y - b.y )^2 + m3 * ( a.z - b.z )^2</p></tt>
 
 <p>We make use of this generalized stereographic projection when it comes to tiling the hyperbolic and spherical planes, which have negative and positive
