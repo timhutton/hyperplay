@@ -102,10 +102,10 @@ function redraw() {
         line( p, sp );
     }
 
-    // show the circle of inversion (along an imaginary axis if the squared radius is negative but we draw it anyway)
+    // show the center of inversion
     ctx.fillStyle = "rgb(255,0,0)";
     point( c, 'C' );
-    circle( c, r );
+    if( r > 0 ) circle( c, r ); // only show the circle itself if its radius is real (else its actually a hyperbola)
     
     // show the metric signature and the current radius
     ctx.font="14px Arial";
@@ -133,12 +133,11 @@ instructions how to enable JavaScript in your web browser</a>.
 
 <body>
 
-<ul>
-<li>Every black point is mapped onto a blue point (and vice versa) by stereographic projection with center C and radius R. Formula below.
-<li>When the squared radius is positive this is the familiar circle inversion from C.
-<li>When the squared radius is negative this means that the radius is imaginary. We need a different metric signature (+,-) for this to work. 
-Now the stereographic projection takes us to and from a hyperbola.
-</ul>
+<p>Every black point is mapped onto a blue point (and vice versa) by stereographic projection with center C and radius R. Your mouse controls the curvature,
+from negative to positive.</p>
+<p>When the squared radius is positive this is the familiar circle inversion from C.</p>
+<p>When the squared radius is negative this means that the radius is imaginary. We need a different metric signature (+,-) for this to work. Details of this are below.
+Now the stereographic projection takes us to and from a hyperbola. This is one way of seeing that the hyperbola is actually a circle of imaginary radius.</p>
 
 <p align="center"><canvas id="canvas" width="1000" height="700">(Canvas drawing not supported by your browser.)</canvas></p>
 
@@ -146,7 +145,7 @@ Now the stereographic projection takes us to and from a hyperbola.
 
 <tt><p>s( p, C, R ) = c + (p-c) * R^2 / dist2( p, c )</p></tt>
 
-<p>where dist2( a, b ) is the squared distance between two points.</p>
+<p>where dist2( ) gives the squared distance between two points:</p>
 
 <p>In the Euclidean plane, with metric signature (+,+):</p>
 <tt><p>dist2( a, b ) = ( a.x - b.x )^2 + ( a.y - b.y )^2</p></tt>
@@ -154,8 +153,12 @@ Now the stereographic projection takes us to and from a hyperbola.
 <p>For the hyperbola projection, with metric signature (+,-):</p>
 <tt><p>dist2( a, b ) = ( a.x - b.x )^2 - ( a.y - b.y )^2</p></tt>
 
-<p>In general we specify the metric tensor as [m1,m2,m3] (e.g. [1,1,-1]) and the generalized squared-distance function becomes (in three dimensions):</p>
+<p>In general we specify the metric tensor as e.g. [ m1, m2, m3 ] = [ 1, 1, -1 ] and the generalized squared-distance function becomes (in three dimensions):</p>
 <tt><p>dist2( a, b ) = m1 * ( a.x - b.x )^2 + m2 * ( a.y - b.y )^2 + m3 * ( a.z - b.z )^2</p></tt>
+
+<p>We make use of this generalized stereographic projection when it comes to tiling the hyperbolic and spherical planes, which have negative and positive
+curvature respectively. A demo of that in 1D shows the construction
+<a href="projection_and_mirroring.html">here</a>.</p>
 
 </html>
 

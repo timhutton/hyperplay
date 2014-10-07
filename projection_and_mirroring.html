@@ -4,8 +4,6 @@
 <meta charset="utf-8">
 <script>
 
-var MirrorType = { SPHERE:1, PLANE:2, POINT:3 };
-
 function p3( x, y, z ) { return { x:x, y:y, z:z }; }
 function p2( x, y ) { return { x:x, y:y }; }
 function add( a, b ) { return p3( a.x + b.x, a.y + b.y, a.z + b.z ); }
@@ -14,16 +12,25 @@ function mul( a, f ) { return p3( a.x * f, a.y * f, a.z * f ); }
 function dot( a, b ) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 function len2( a ) { return dot(a,a); }
 function dist( a, b ) { return Math.sqrt( len2( sub( a, b ) ) ); }
-function assign( a, b ) { a.x = b.x; a.y = b.y; a.z = b.z; }
 function normalize( a ) { return mul( a, 1 / Math.sqrt( len2( a ) ) ); }
 function cross( a, b ) { return p3( a.y * b.z - a.z * b.y, a.z*b.x - a.x * b.z, a.x * b.y - a.y * b.x ); }
 function circle_radius( a, b, c ) { return a*b*c / Math.sqrt( (a+b+c)*(-a+b+c)*(a-b+c)*(a+b-c) ); } // triangle with side lengths a,b,c
+function generalized_dist2( a, b, m ) { return m.x*Math.pow(a.x-b.x,2) + m.y*Math.pow(a.y-b.y,2) + m.z*Math.pow(a.z-b.z,2); } // m is metric signature, e.g. [1,1,-1] for hyperboloid model
+function sign( x ) { return (x>0)?1:((x<0)?-1:0); }
+function sphereInversion( p, sphere ) {
+    var d2 = generalized_dist2( p, sphere.p, sphere.metric_signature );
+    return add( sphere.p, mul( sub( p, sphere.p ), sphere.r2 / d2 ) );
+}
+function planeReflection( p, plane ) {
+    var pn = dot( plane.n, sub( p, plane.p ) );
+    var proj = sub( p, mul( plane.n, pn ) );
+    return add( proj, sub( proj, p ) );
+}
+function pointReflection( p, point ) {
+    return add( point.p, sub( point.p, p ) );
+}
 
-var canvas;
-var ctx;
-var f;
-var scale;
-var translate;
+var MirrorType = { SPHERE:1, PLANE:2, POINT:3 };
 
 function reflect( p, mirror ) {
     switch( mirror.type ) {
@@ -35,6 +42,12 @@ function reflect( p, mirror ) {
             return pointReflection( p, mirror );
     }
 }
+
+var canvas;
+var ctx;
+var f;
+var scale;
+var translate;
 
 function getMousePos(canvas, evt) {
     var rect = canvas.getBoundingClientRect();
@@ -59,45 +72,6 @@ function init() {
     canvas.addEventListener( 'mousemove', onMouseMove, false );
 }
 
-function sphereInversion( p, sphere ) {
-    var d2 = len2( sub( p, sphere.p ) );
-    return add( sphere.p, mul( sub( p, sphere.p ), sphere.r2 / d2 ) );
-}
-
-function planeReflection( p, plane ) {
-    var pn = dot( plane.n, sub( p, plane.p ) );
-    var proj = sub( p, mul( plane.n, pn ) );
-    return add( proj, sub( proj, p ) );
-}
-
-function pointReflection( p, point ) {
-    return add( point.p, sub( point.p, p ) );
-}
-
-function fromHyperbola( p ) {
-    // from the unit hyperbola a=b=1 centered at the origin, to the x-axis
-    return p3( p.x / ( 1.0 + p.y ), 0, 0 );
-}
-
-function toHyperbola( p ) {
-    // from the x-axis to the unit hyperbola a=b=1 centered at the origin
-    return p3( 2.0*p.x/(1.0-p.x*p.x), (1.0+p.x*p.x)/(1.0-p.x*p.x), 0 );
-}
-
-function toOurHyperbola( p, o, R ) {
-    // p should lie on the x-axis
-    var hp = toHyperbola( p3( 0.5 * p.x / R, 0, 0 ) );
-    hp.y *= -1;
-    return add( mul( hp, R ), o );
-}
-
-function fromOurHyperbola( p, o, R ) {
-    var hp = mul( sub( p, o ), 1.0 / R );
-    hp.y *= -1;
-    var ap = fromHyperbola( hp );
-    return p3( 2.0 * R * ap.x, 0, 0 );
-}
-
 function moveTo( a ) { ctx.moveTo( a.x*scale + translate.x, translate.y - a.y*scale ); }
 function lineTo( a ) { ctx.lineTo( a.x*scale + translate.x, translate.y - a.y*scale ); }
 function line( a, b ) { 
@@ -119,7 +93,7 @@ function redraw() {
     var blackFillStyle = "rgb(0,0,0)";
     var thinLineStyle = "rgba(0,0,0,0.3)";
     var homeLineStyle = "rgba(180,180,0,1)";
-    var homeFillStyle = "rgba(180,180,0,0.05)";
+    var homeFillStyle = "rgba(180,180,0,0.1)";
     var redLineStyle = "rgb(255,0,0)";
     var blueLineStyle = "rgb(0,127,255)";
     var greenLineStyle = "rgb(0,127,0)";
@@ -128,6 +102,7 @@ function redraw() {
     var cyanLineStyle = "rgb(0,255,255)";
     
     ctx.strokeStyle = thinLineStyle;
+    ctx.fillStyle = blackFillStyle;
     ctx.lineWidth = 1;
     ctx.font="12px Verdana";
     
@@ -139,103 +114,74 @@ function redraw() {
 
     var R = 1.0 / f;
     R *= 100;
+    R2 = sign(R)*R*R;
     
     var c = p3(0,0,0);
     point( c, 'C' );
     var a = p3(0.7,0,0);
     point( a, 'A' );
 
-    // construct a circle where things live sometimes oh heck it must have a name
+    // define the origin
     var o = p3(0,R,0);
     point( o, 'O' );
-    if( R > 0 )
-        ctx.strokeStyle = homeLineStyle; // for positive curvature this circle is our home surface
-    circle( o, R );
-    if( R > 0 ) {
-        ctx.fillStyle = homeFillStyle;
-        ctx.fill();
-        ctx.fillStyle = blackFillStyle;
-        ctx.strokeStyle = thinLineStyle;
-    }
-    
-    // construct the inversion circle that we can use to project stereographically to and from the circle
+    // construct the inversion that we use to project stereographically to and from the plane
     var SR = 2.0 * R;
+    var SR2 = 4.0 * R2;
     var s = p3( 0, SR, 0 );
-    var inversion = { type:MirrorType.SPHERE, p:s, r2:SR*SR };
-    //circle( s, SR );
+    var inversion = { type:MirrorType.SPHERE, p:s, r2:SR2, metric_signature:p3(1,sign(R),0) };
+    //circle( s, SR ); // is only a circle if the radius is real
     point( s, 'S' );
 
-    var central_mirror = { type:MirrorType.PLANE, p:c, n:p3(1,0,0) };
-      
-    var b,d,m;
     if( R > 0 ) {
-        b = reflect( a, inversion );
-        // construct other points on the mirror using the geodesic on the sphere
-        d = add( o, sub( o, b ) );
-        m = reflect( d, inversion );
-        
-        line( s, m );
-        line( a, s );
-    }
-    else {
-        var w = p3(-2*R,0,0); 
-        var e = p3(2*R,0,0); 
-        point( w,'W');
-        point( e,'E');
-        line( s, e );
-        line( s, w );
-
-        // draw the hyperbola itself
-        var step = 0.01;
         ctx.fillStyle = homeFillStyle;
         ctx.strokeStyle = homeLineStyle;
+        circle( o, R ); // for positive curvature this circle is our home surface
+        ctx.fill();
+        ctx.fillStyle = blackFillStyle;
+        ctx.strokeStyle = thinLineStyle;
+    }
+    else {
+        // draw the hyperbola
+        ctx.strokeStyle = homeLineStyle;
+        ctx.fillStyle = homeFillStyle;
+        var step = Math.abs( R ) / 100.0;
         ctx.beginPath();
-        var x = -1+step;
-        var e1 = toHyperbola( p3( x-step/2,0,0) );
-        e1 = mul( e1, R );
-        moveTo( e1 );
-        for( ; x <= 1-step; x+=step ) {
-            var e2 = toHyperbola( p3( x+step/2,0,0) );
-            e2 = mul( e2, R );
-            lineTo( add( e2, o ) );
-        }
+        var x = -2.0 * Math.abs(R) + step;
+        moveTo( reflect( p3(x,0,0), inversion  ) );
+        for( ; x <= 2.0 * Math.abs(R); x += step )
+            lineTo( reflect( p3(x,0,0), inversion ) );
         ctx.fill();
         ctx.stroke();
         ctx.beginPath();
-        x = -1+step;
-        e1 = toHyperbola( p3( x-step/2,0,0) );
-        e1 = mul( e1, R );
-        e1 = p3( e1.x, -e1.y, e1.z );
-        moveTo( e1 );
-        for( ; x <= 1-step; x+=step ) {
-            var e2 = toHyperbola( p3( x+step/2,0,0) );
-            e2 = mul( e2, R );
-            e2 = p3( e2.x, -e2.y, e2.z );
-            lineTo( add( e2, o ) );
-        }
+        step = Math.abs( R ) * 0.1;
+        var x = 2.1 * Math.abs(R) + step;
+        moveTo( reflect( p3(x,0,0), inversion  ) );
+        for( ; x <= 100.0*Math.abs(R); x += step )
+            lineTo( reflect( p3(x,0,0), inversion ) );
+        x = -100.0*Math.abs(R);
+        for( ; x < -2.1*Math.abs(R); x += step )
+            lineTo( reflect( p3(x,0,0), inversion ) );
         ctx.fill();
         ctx.stroke();
         ctx.fillStyle = blackFillStyle;
         ctx.strokeStyle = thinLineStyle;
-        line( p3(o.x-R,o.y,o.z), p3(o.x+R,o.y,o.z) ); // the Klein plane
-        
-        b = toOurHyperbola( a, o, R );
-        
-        // construct other points on the mirror using the geodesic on the hemisphere model
-        d = add( o, sub( o, b ) );
-        m = fromOurHyperbola( d, o, R );
-        
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = thinLineStyle;
-        line( b, s );
-        line( d, m );
     }
     
-    // draw the plane through that point and the origin that makes a geodesic on the hyperbola
+    var central_mirror = { type:MirrorType.PLANE, p:c, n:p3(1,0,0) };
+      
+    var b = reflect( a, inversion );
+    // construct another point on the mirror using the geodesic and project it to the plane
+    var d = add( o, sub( o, b ) );
+    var m = reflect( d, inversion );
+    
+    line( s, m );
+    line( a, s );
+    point( b, 'B' );
+
+    // draw the geodesic
     ctx.lineWidth = 1;
     ctx.strokeStyle = lightGreenLineStyle;
     line( sub( o, mul( sub( b, o ), 100 ) ), add( o, mul( sub( b, o ), 100 ) ) ); // B-O-D
-    point( b, 'B' );
     
     // draw the other side of the mirror and its projection
     ctx.lineWidth = 1;
@@ -248,10 +194,10 @@ function redraw() {
     line( c, a );
     line( b, c );
     
-    // construct the inversion circle for the mirror at a, and reflect c onto g
+    // construct the 1D inversion circle for the mirror at a, and reflect c onto g
     var k = mul( add( a, m ), 0.5 ); // center of the inversion sphere
-    var mirror = { type:MirrorType.SPHERE, p:k, r2:Math.pow( dist( a, k ), 2 ) };
-    point( k );
+    var mirror = { type:MirrorType.SPHERE, p:k, r2:Math.pow( dist( a, k ), 2 ), metric_signature:p3(1,1,0) };
+    point( k, 'K' );
     var g = reflect( c, mirror );
     ctx.strokeStyle = blueLineStyle;
     ctx.lineWidth = 2;
@@ -269,21 +215,11 @@ function redraw() {
     ctx.strokeStyle = cyanLineStyle;
     line( v, y );
     // project points onto the surface
-    var gp,vp,up,wp;
-    if( R > 0 ) {
-        gp = reflect( g, inversion );
-        up = reflect( u, inversion );
-        vp = reflect( v, inversion );
-        wp = reflect( w, inversion );
-        yp = reflect( y, inversion );
-    }
-    else {
-        gp = toOurHyperbola( g, o, R );
-        up = toOurHyperbola( u, o, R );
-        vp = toOurHyperbola( v, o, R );
-        wp = toOurHyperbola( w, o, R );
-        yp = toOurHyperbola( y, o, R );
-    }
+    var gp = reflect( g, inversion );
+    var up = reflect( u, inversion );
+    var vp = reflect( v, inversion );
+    var wp = reflect( w, inversion );
+    var yp = reflect( y, inversion );
     ctx.lineWidth = 2;
     ctx.strokeStyle = blueLineStyle;
     line( b, gp );
@@ -302,6 +238,12 @@ function redraw() {
     line( v, vp );
     line( w, wp );
     line( y, yp );
+    
+    if( R < 0 ) {
+        // draw a few missing lines (don't want to overdraw them in the positive curvature case)
+        line( d, s );
+        line( a, b );
+    }
 }
 
 window.onload = init;
@@ -317,7 +259,36 @@ instructions how to enable JavaScript in your web browser</a>.
 
 <body>
 
+<p>A tiling of a 1D line is shown under varying curvature. Move the mouse to change the curvature between spherical geometry (positive curvature) and hyperbolic geometry (negative curvature).</p>
+
+<p>For positive curvatures the tiling lives on a circle. The mapping to the line is provided by stereographic projection from point S.</p>
+
+<p>For negative curvatures the tiling lives on one sheet of a hyperbola. Stereographic projection is still used to map onto the line, giving a 1D version of the Poincaré disk model.</p>
+
+<p>While this 1D case is pretty boring, the details of construction are exactly the same when we move into 2 and 3 dimensions. The details are given below.</p>
+
 <p align="center"><canvas id="canvas" width="1000" height="700">(Canvas drawing not supported by your browser.)</canvas></p>
+
+<p>So we want to make a tiling. We're going to use Wythoff construction, where we put down a single tile and then repeatedly reflect it in its edges.<p>
+
+<p>The red line between C and B is our first tile. The first edge, at C, is easy to make a mirror for: the scene is already symmetric around this point 
+so we simply reflect across it. The second edge of the tile, at B, is more tricky.</p>
+
+<p>The light green line shows the geodesic of edge B - the plane that passes through the edge and the origin O. All points on this geodesic will be unaffected
+by the mirroring. In our 1D example the only other such point is D.</p>
+
+<p>The points B and D project onto the stereographic plane at A and M. They define a circle of inversion in the stereographic plane that we can use to reflect
+the tile. It has its center at point K that in this 1D case is halfway between them.</p>
+
+<p>We can then reflect the red tile C-A using the circle of inversion A-K-M. This leaves A where it is and puts C onto point G, 
+making our new tile A-G, drawn in blue.</p>
+
+<p>Reflecting that tile A-C in C gives the dark green tile. Reflecting that tile over A gives the pink tile on the other side of G, and so on.</p>
+
+<p>In 2D and 3D the process is the same - the tile is reflected in the circle (or sphere) of inversion defined by each of its facets. For certain values
+of curvature the tiles all line up and we get a regular tiling of the hyperbolic plane or of the sphere. In the spherical case we call this a polyhedron or a polychoron.</p>
+
+<p>So what is negative curvature? And why a hyperbola? These questions are addressed in another demo <a href="generalized_stereographic_projection.html">here</a>.
 
 </html>
 
