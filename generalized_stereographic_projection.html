@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script>
+
+function p3( x, y, z ) { return { x:x, y:y, z:z }; }
+function add( a, b ) { return p3( a.x + b.x, a.y + b.y, a.z + b.z ); }
+function sub( a, b ) { return p3( a.x - b.x, a.y - b.y, a.z - b.z ); }
+function mul( a, f ) { return p3( a.x * f, a.y * f, a.z * f ); }
+
+var canvas;
+var ctx;
+var scale;
+var translate;
+var mp = p3(0,0,0);
+
+function getMousePos(canvas, evt) {
+    var rect = canvas.getBoundingClientRect();
+    return p3( evt.clientX - rect.left, evt.clientY - rect.top, 0 );
+}
+
+function onMouseMove( evt ) {
+    mp = getMousePos( canvas, evt );
+    redraw();
+}
+
+function init() {
+    canvas = document.getElementById('canvas');
+    ctx = canvas.getContext('2d');
+
+    scale = 100.0;
+    translate = p3( canvas.width/2, canvas.height/2, 0 );
+    redraw();
+
+    canvas.addEventListener( 'mousemove', onMouseMove, false );
+}
+
+function moveTo( a ) { ctx.moveTo( a.x*scale + translate.x, translate.y - a.y*scale ); }
+function lineTo( a ) { ctx.lineTo( a.x*scale + translate.x, translate.y - a.y*scale ); }
+function line( a, b ) { 
+    ctx.beginPath();
+    moveTo( a );
+    lineTo( b );
+    ctx.stroke();
+}
+function circle( c, R ) { ctx.beginPath(); ctx.arc( c.x*scale + translate.x, translate.y - c.y*scale, Math.abs(R)*scale, 0, 2.0 * Math.PI ); ctx.stroke(); }
+function point( p, t ) { 
+    ctx.beginPath(); 
+    ctx.arc( p.x*scale + translate.x, translate.y - p.y*scale, 2, 0, 2.0 * Math.PI ); 
+    if( t )
+        ctx.fillText( t, p.x*scale + translate.x + 3, translate.y - p.y*scale - 3 );
+    ctx.fill(); 
+}
+
+// squared-distance function, generalized for different metric signatures
+// e.g. [1,1,0] is the 2D Euclidean plane XY,
+//      [1,-1,0] is the hyperbola model XY,
+//      [1,1,-1] is the hyperboloid model XYZ
+function dist2( p1, p2, metric_signature ) {
+    return metric_signature[0] * Math.pow( p1.x - p2.x, 2 ) 
+         + metric_signature[1] * Math.pow( p1.y - p2.y, 2 )
+         + metric_signature[2] * Math.pow( p1.z - p2.z, 2 );
+}
+
+// generalized stereographic projection: 
+function stereographic_projection( p, c, r2, metric_signature ) { 
+    return add( c, mul( sub( p, c ), r2 / dist2( p, c, metric_signature) ) );
+}
+
+function sign( x ) {
+    return (x>0)?1:((x<0)?-1:0);
+}
+
+function redraw() {
+
+    ctx.strokeStyle = "rgba(0,0,0,0.1)";
+
+    ctx.clearRect( 0, 0, canvas.width, canvas.height );
+    ctx.strokeRect( 0, 0, canvas.width, canvas.height );
+   
+    // mouse controls r2, from negative to positive
+    var f = ( mp.x - canvas.width/2 ) / 300;
+    var r = 1.0 / f;
+    var r2 = r*r*sign(r);
+    
+    // if r2 is negative then we need a different metric signature
+    var metric_signature = [ 1, sign(r2), 0 ];
+    var c = p3( 0, sign(r2)*Math.sqrt(Math.abs(r2)), 0 );
+    
+    // draw each point in turn
+    for( var x = -5; x < 5; x+=0.1 ) {
+        // draw the black point on the line
+        var p = p3(x,0,0);
+        ctx.fillStyle = "rgb(0,0,0)";
+        point( p );
+        // draw the blue point that is the stereographic projection
+        var sp = stereographic_projection( p, c, r2, metric_signature );
+        ctx.fillStyle = "rgb(0,0,255)";
+        point( sp );
+        // draw a line between them
+        line( p, sp );
+    }
+
+    // show the circle of inversion (along an imaginary axis is the squared radius is negative)
+    ctx.fillStyle = "rgb(255,0,0)";
+    point( c, 'C' );
+    circle( c, r );
+    
+    // show the metric signature and the current radius
+    ctx.font="14px Arial";
+    ctx.fillStyle="rgba(0,0,0,0.4)";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.fillText( "Metric signature: ( " + 
+                  ((metric_signature[0]>0)?"+":"-") + ", " + 
+                  ((metric_signature[1]>0)?"+":"-") + " )", 
+                  20, canvas.height-20 );
+    ctx.fillText( "Radius squared: " + r2.toFixed(1), 20, canvas.height-50 );
+}
+
+window.onload = init;
+</script>
+
+<noscript>
+<p>
+For full functionality of this site it is necessary to enable JavaScript.
+Here are the <a href="http://www.enable-javascript.com/" target="_blank">
+instructions how to enable JavaScript in your web browser</a>.
+</p></noscript>
+
+</head>
+
+<body>
+
+<ul>
+<li>Every black point is mapped onto a blue point (and vice versa) by stereographic projection with center C and radius R. Formula below.
+<li>When the squared radius is positive this is the familiar circle inversion from C.
+<li>When the squared radius is negative this means that the radius is imaginary. We need a different metric signature (+,-) for this to work. 
+Now the stereographic projection takes us to and from a hyperbola.
+</ul>
+
+<p align="center"><canvas id="canvas" width="1000" height="700">(Canvas drawing not supported by your browser.)</canvas></p>
+
+<p>Stereographic projection, with respect to a center C and radius R:</p>
+
+<tt><p>s( p, C, R ) = c + (p-c) * R^2 / dist2( p, c )</p></tt>
+
+<p>where dist2( a, b ) is the squared distance between two points.</p>
+
+<p>In the Euclidean plane, with metric signature (+,+):</p>
+<tt><p>dist2( a, b ) = ( a.x - b.x )^2 + ( a.y - b.y )^2</p></tt>
+
+<p>For the hyperbola projection, with metric signature (+,-):</p>
+<tt><p>dist2( a, b ) = ( a.x - b.x )^2 - ( a.y - b.y )^2</p></tt>
+
+<p>In general we specify the metric tensor as [m1,m2,m3] (e.g. [1,1,-1]) and the generalized squared-distance function becomes (in three dimensions):</p>
+<tt><p>dist2( a, b ) = m1 * ( a.x - b.x )^2 + m2 * ( a.y - b.y )^2 + m3 * ( a.z - b.z )^2</p></tt>
+
+</html>
+
