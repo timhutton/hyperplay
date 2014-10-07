@@ -89,7 +89,7 @@ function redraw() {
     var c = p3( 0, sign(r2)*Math.sqrt(Math.abs(r2)), 0 );
     
     // draw each point in turn
-    for( var x = -5; x < 5; x+=0.1 ) {
+    for( var x = -10; x < 10; x+=0.1 ) {
         // draw the black point on the line
         var p = p3(x,0,0);
         ctx.fillStyle = "rgb(0,0,0)";
@@ -102,7 +102,7 @@ function redraw() {
         line( p, sp );
     }
 
-    // show the circle of inversion (along an imaginary axis is the squared radius is negative)
+    // show the circle of inversion (along an imaginary axis if the squared radius is negative but we draw it anyway)
     ctx.fillStyle = "rgb(255,0,0)";
     point( c, 'C' );
     circle( c, r );
