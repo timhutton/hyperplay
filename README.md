@@ -5,7 +5,7 @@ hyperplay
 
 [**PLAY HERE!**](http://timhutton.github.io/hyperplay/) 
 
-(Or, if you are feeling adventurous, you can play the advanced version [here](http://timhutton.github.io/hyperplay/index_sliders.html). Look on the [wiki](https://github.com/timhutton/hyperplay/wiki) for some interesting starting points. I'm also making some interactive demonstration of the concepts involved, mostly for my own understanding at the moment, work in progress: [reciprocation](http://timhutton.github.io/hyperplay/reciprocation.html), [stereographic projection and mirroring](http://timhutton.github.io/hyperplay/projection_and_mirroring.html), [detailed version in 1D](http://timhutton.github.io/hyperplay/explanation_1D.html) )
+(Or, if you are feeling adventurous, you can play the advanced version [here](http://timhutton.github.io/hyperplay/index_sliders.html). Look on the [wiki](https://github.com/timhutton/hyperplay/wiki) for some interesting starting points. I'm also making some interactive demonstration of the concepts involved, mostly for my own understanding at the moment, work in progress: [generalized stereographic projection](http://timhutton.github.io/hyperplay/generalized_stereographic_projection.html), [projection and mirroring](http://timhutton.github.io/hyperplay/projection_and_mirroring.html), [detailed version in 1D](http://timhutton.github.io/hyperplay/explanation_1D.html) )
 
 Usage:
 ------
