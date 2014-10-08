@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script>
+
+var MirrorType = { SPHERE:1, PLANE:2, POINT:3 };
+
+function p3( x, y, z ) { return { x:x, y:y, z:z }; }
+function p2( x, y ) { return { x:x, y:y }; }
+function origin() { return p3(0,0,0); }
+function xaxis() { return p3(1,0,0); }
+function yaxis() { return p3(0,1,0); }
+function zaxis() { return p3(0,0,0); }
+function add( a, b ) { return p3( a.x + b.x, a.y + b.y, a.z + b.z ); }
+function sub( a, b ) { return p3( a.x - b.x, a.y - b.y, a.z - b.z ); }
+function mul( a, f ) { return p3( a.x * f, a.y * f, a.z * f ); }
+function dot( a, b ) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+function len2( a ) { return dot(a,a); }
+function dist( a, b ) { return Math.sqrt( len2( sub( a, b ) ) ); }
+function assign( a, b ) { a.x = b.x; a.y = b.y; a.z = b.z; }
+function normalize( a ) { return mul( a, 1 / Math.sqrt( len2( a ) ) ); }
+function cross( a, b ) { return p3( a.y * b.z - a.z * b.y, a.z*b.x - a.x * b.z, a.x * b.y - a.y * b.x ); }
+function inversion_sphere_from_line_and_two_points( a, b, p1, p2 ) {
+    // What is the sphere which has center on a line a-b and surface passing through points p1 and p2?
+    // Find the intersection between the line and the plane halfway between p1 and p2 (we assume a solution exists)
+    var mp = mul( add( p1, p2 ), 0.5 );
+    var pn = sub( p1, p2 );
+    var ln = sub( b, a );
+    // at the intersection c of the line and the plane we know that a + t*ln = c and ( c - mp ).pn = 0
+    // hence ( a + t*ln - mp ).pn = 0
+    // hence t*ln.pn + (a-mp).pn = 0
+    // hence t = (mp-a).pn / ln.pn
+    var t = dot( sub( mp, a ), pn ) / dot( ln, pn );
+    var c = add( a, mul( ln, t ) );
+    var r = dist( c, p1 ); // check: dist(c,p1)==dist(c,p2)
+    return { type:MirrorType.SPHERE, p:c, r2:r*r, metric_signature:p3(1,1,1) };
+}
+function sphereInversion( p, sphere ) {
+    var d2 = generalized_dist2( p, sphere.p, sphere.metric_signature );
+    return add( sphere.p, mul( sub( p, sphere.p ), sphere.r2 / d2 ) );
+}
+function planeReflection( p, plane ) {
+    var pn = dot( plane.n, sub( p, plane.p ) );
+    var proj = sub( p, mul( plane.n, pn ) );
+    return add( proj, sub( proj, p ) );
+}
+function pointReflection( p, point ) {
+    return add( point.p, sub( point.p, p ) );
+}
+function generalized_dist2( p1, p2, metric_signature ) {
+    // squared-distance function, generalized for different metric signatures
+    // e.g. [1,1,0] is the 2D Euclidean plane XY,
+    //      [1,-1,0] is the hyperbola model XY,
+    //      [1,1,-1] is the hyperboloid model XYZ
+    return metric_signature.x * Math.pow( p1.x - p2.x, 2 ) 
+         + metric_signature.y * Math.pow( p1.y - p2.y, 2 )
+         + metric_signature.z * Math.pow( p1.z - p2.z, 2 );
+}
+function sign( x ) {
+    return (x>0)?1:((x<0)?-1:0);
+}
+function reflect( p, mirror ) {
+    switch( mirror.type ) {
+        case MirrorType.SPHERE: return sphereInversion( p, mirror );
+        case MirrorType.PLANE:  return planeReflection( p, mirror );
+        case MirrorType.POINT:  return pointReflection( p, mirror );
+    }
+}
+
+var theta;
+var view_height;
+var camera;
+var sliders;
+var iActiveSlider;
+var curvatureRange = 2;
+var isSpinning = true;
+
+function curvatureFromSliderPos( v ) { return ( v - 0.5 ) * curvatureRange; }
+function sliderPosFromCurvature( f ) { return f / curvatureRange + 0.5; }
+
+function getMousePos(canvas, evt) {
+    var rect = canvas.getBoundingClientRect();
+    return p2( evt.clientX - rect.left, evt.clientY - rect.top );
+}
+
+function onMouseMove( evt ) {
+    var pos = getMousePos( canvas, evt );
+    if( iActiveSlider >= 0 ) {
+        var slider = sliders[ iActiveSlider ];
+        slider.value = Math.min( 1, Math.max( 0, ( pos.x - slider.x ) / slider.width ) );
+    }
+    view_height = ( canvas.height / 2.0 - pos.y ) / canvas.height;
+    repositionCamera();
+}
+
+function onMouseDown( evt ) {
+    var pos = getMousePos( canvas, evt );
+    for( var iSlider = 0; iSlider < sliders.length; ++iSlider ) {
+        if( pointInRect( pos, sliders[ iSlider ].handle_rect ) ) {
+            iActiveSlider = iSlider;
+            return;
+        }
+    }
+    isSpinning = !isSpinning;
+    if( isSpinning ) animate();
+}
+
+function onMouseUp( evt ) {
+    iActiveSlider = -1;
+    redraw();
+}
+
+function repositionCamera() {
+    var look_at = p3(0,0,0);
+    var d = 20;
+    var vd = d * view_height;
+    var hd = Math.sqrt( d*d - vd*vd );
+    camera.p = p3( hd*Math.cos(theta), hd*Math.sin(theta), vd  );
+    camera.z = normalize( sub( look_at, camera.p ) );
+    var up = p3(0,0,1);
+    camera.x = normalize( cross( camera.z, up ) );
+    camera.y = normalize( cross( camera.x, camera.z ) );
+}
+
+function pointInRect( p, rect ) {
+    return p.x > rect.x && p.x < ( rect.x + rect.width ) &&
+           p.y > rect.y && p.y < ( rect.y + rect.height );
+}
+
+function init() {
+    canvas = document.getElementById('canvas');
+    ctx = canvas.getContext('2d');
+
+    sliders = [];
+    sliders[0] = { x: 10, y:10, width:canvas.width-20, height:20, value:sliderPosFromCurvature(0.1), handle_rect:{} };
+    isActiveSlider = -1;
+    
+    theta = Math.PI / 2;
+    view_height = 0.5;
+    camera = { p:p3(0,3,-6),
+               x:p3(1,0,0), 
+               y:p3(0,1,0), 
+               z:p3(0,0,1), 
+               f:canvas.height,
+               pp:p2(canvas.width/2,canvas.height/2) 
+             };
+    repositionCamera();
+    
+    redraw();
+
+    canvas.addEventListener( 'mousemove', onMouseMove, false );
+    canvas.addEventListener( 'touchmove', onMouseMove, false );
+    canvas.addEventListener( 'touchstart', onMouseDown, false );
+    canvas.addEventListener( 'mousedown',  onMouseDown, false );
+    canvas.addEventListener( 'touchend', onMouseUp, false );
+    canvas.addEventListener( 'mouseup',  onMouseUp, false );
+    canvas.addEventListener( 'mouseout',  onMouseUp, false );
+    
+    animate();
+}
+
+function camera_projection( p, camera ) {
+    var ray = sub( p, camera.p ); // the ray from camera center to point
+    var cp = p3( dot( camera.x, ray ), dot( camera.y, ray ), dot( camera.z, ray ) ); // into camera space
+    return p3( cp.x * camera.f / cp.z + camera.pp.x, 
+               canvas.height - ( cp.y * camera.f / cp.z + camera.pp.y ),
+               cp.z );
+}
+
+function redraw() {
+    drawMesh();
+    drawUI();
+}
+
+function traverse( points ) {
+    var last_was_good = false;
+    for( var iVert = 0; iVert < points.length; ++iVert ) {
+        if( points[ iVert ].z > 0.1 ) {
+            if( last_was_good )
+                ctx.lineTo( points[ iVert ].x, points[ iVert ].y );
+            else
+                ctx.moveTo( points[ iVert ].x, points[ iVert ].y );
+            last_was_good = true;
+        }
+        else {
+            last_was_good = false;
+        }
+    }
+}
+
+function point( p, t ) { 
+    ctx.beginPath(); 
+    ctx.arc( p.x, p.y, 2, 0, 2.0 * Math.PI ); 
+    ctx.fillText( t, p.x + 3, p.y - 3 );
+    ctx.fill(); 
+}
+
+function drawMesh() {
+
+    var depth = 1;
+
+    var faces = [];
+    var lines = [];
+    var construction_lines = [];
+    
+    // define our base polygon
+    var polygon = [];
+    var N = 4;
+    var R_polygon = 2;
+    for( var i = 0; i < N; ++i ) {
+        polygon.push( p3( R_polygon * Math.cos( i * 2.0 * Math.PI / N ), R_polygon * Math.sin( i * 2.0 * Math.PI / N, 0 ), 0 ) );
+    }
+    // define the main sphere inversion that takes us between the curved surface and the stereographic plane
+    var f = curvatureFromSliderPos( sliders[ 0 ].value );
+    var R_squared = 1.0 / f;
+    var R_real = sign( R_squared ) * Math.sqrt( Math.abs( R_squared ) );
+    var o = p3(0,0,R_real);
+    var s = mul( o, 2.0 );
+    var surface = { type:MirrorType.SPHERE, p:s, r2:4.0*R_squared, metric_signature:p3(1,1,sign(R_squared)) };
+    var central_mirror = { type:MirrorType.POINT, p:o };
+
+    var A = polygon[ 0 ];
+    var B = reflect( A, surface );
+    var D = reflect( B, central_mirror );
+    var M = reflect( D, surface );
+
+    var mirrors = [];
+    // for each edge, construct its projection onto the curved surface and its circle of inversion in the plane
+    var curved_polygon = [];
+    var curved_polygon_projected = [];
+    for( var iVert = 0; iVert < polygon.length; ++iVert ) {
+        var a = polygon[ iVert ];
+        var b = polygon[ (iVert+1)%polygon.length ];
+        var ap = reflect( a, surface );
+        var bp = reflect( b, surface );
+        var map = add( o, sub( o, ap ) );
+        var mbp = add( o, sub( o, bp ) );
+        var ma = reflect( map, surface );
+        var mb = reflect( mbp, surface );
+        var ic = inversion_sphere_from_line_and_two_points( mul( add( a, b ), 0.5 ), mul( add( ma, mb ), 0.5 ), a, ma );
+        mirrors.push( ic );
+        // draw the geodesic section that is between a and b
+        var geodesic_segment = [];
+        var geodesic_segment_projected = [];
+        var geodesic_segment_projected_mirrored = [];
+        var geodesic_segment_mirrored = [];
+        var np = 20;
+        for( var t = 0; t <= np; ++t ) {
+            var p_straight = add( a, mul( sub( b, a ), t * 1.0 / np ) );
+            var p_curved = add( ic.p, mul( normalize( sub( p_straight, ic.p ) ), Math.sqrt( ic.r2 ) ) );
+            geodesic_segment.push( p_curved );
+            curved_polygon.push( p_curved );
+            var p_curved_projected = reflect( p_curved, surface );
+            var p_curved_projected_mirrored = reflect( p_curved_projected, central_mirror );
+            var p_curved_mirrored = reflect( p_curved_projected_mirrored, surface );
+            curved_polygon_projected.push( p_curved_projected );
+            geodesic_segment_projected.push( p_curved_projected );
+            geodesic_segment_projected_mirrored.push( p_curved_projected_mirrored );
+            geodesic_segment_mirrored.push( p_curved_mirrored );
+        }
+        construction_lines.push( [ a, s, ap ] );
+        construction_lines.push( [ b, s, bp ] );
+        if( iVert == 0 ) {
+            lines.push( geodesic_segment );
+            lines.push( geodesic_segment_projected );
+            lines.push( geodesic_segment_projected_mirrored );
+            lines.push( geodesic_segment_mirrored );
+            construction_lines.push( [ ap, bp, map, mbp, ap ] ); // the geodesic plane for this edge
+             // the projection of the geodesic plane for this edge
+            construction_lines.push( [ map, ma ] );
+            construction_lines.push( [ mbp, mb ] );
+            // draw the inversion circle
+            var np = 100;
+            var icp = [];
+            var r = Math.sqrt( ic.r2 );
+            for( var i = 0; i <= np; ++i )
+                icp.push( p3( ic.p.x + r*Math.cos( i * 2.0 * Math.PI / np ), ic.p.y + r*Math.sin( i * 2.0 * Math.PI / np ), 0 ) );
+            icp.push( icp[0] );
+            construction_lines.push( icp );
+            if( R_squared > 0 ) 
+            {
+                // draw the inversion circle on the sphere
+                var icps = [];
+                for( var i = 0; i < icp.length; ++i )
+                    icps.push( reflect( icp[ i ], surface ) );
+                construction_lines.push( icps );
+            }
+        }
+    }
+    faces.push( curved_polygon );
+    faces.push( curved_polygon_projected );
+    // reflect the face in all the mirrors
+    for( var iMirror = 0; iMirror < mirrors.length; ++iMirror ) {
+        var face2 = [];
+        var face2_projected = [];
+        for( var iVert = 0; iVert < curved_polygon.length; ++iVert )
+        {
+            var p = reflect( curved_polygon[ iVert ], mirrors[ iMirror ] );
+            var pp = reflect( p, surface );
+            face2.push( p );
+            face2_projected.push( pp );
+        }
+        faces.push( face2 );
+        faces.push( face2_projected );
+        // also add construction lines for the base polygon
+        for( var iVert = 0; iVert < polygon.length; ++iVert ) {
+            var p = reflect( polygon[ iVert ], mirrors[ iMirror ] );
+            var pp = reflect( p, surface );
+            if( R_squared > 0 ) construction_lines.push( [ p, s, pp ] );
+        }
+        // then reflect those faces in the mirrors again
+        if( depth > 1 ) {
+            for( var iMirror2 = 0; iMirror2 < mirrors.length; ++iMirror2 ) {
+                if( iMirror2 == iMirror ) continue; // no point returning to the start again
+                var face3 = [];
+                var face3_projected = [];
+                for( var iVert = 0; iVert < face2.length; ++iVert ) {
+                    var p = reflect( face2[ iVert ], mirrors[ iMirror2 ] );
+                    var pp = reflect( p, surface );
+                    face3.push( p );
+                    face3_projected.push( pp );
+                }
+                faces.push( face3 );
+                faces.push( face3_projected );
+                // also add construction lines for the base polygon
+                for( var iVert = 0; iVert < polygon.length; ++iVert ) {
+                    var p = reflect( polygon[ iVert ], mirrors[ iMirror ] );
+                    p = reflect( p, mirrors[ iMirror2 ] );
+                    var pp = reflect( p, surface );
+                    if( R_squared > 0 ) construction_lines.push( [ p, s, pp ] );
+                }
+            }
+        }
+    }
+    // show the curved surface itself
+    if( R_squared > 0 ) {
+        // lines of longitude
+        var nTheta = 100;
+        var nPhi = 10;
+        for( var iPhi = 0; iPhi < nPhi; ++iPhi ) {
+            var phi = iPhi * Math.PI / nPhi;
+            var gc = [];
+            for( var iTheta = 0; iTheta <= nTheta; ++iTheta ) {
+                var theta = iTheta * 2.0 * Math.PI / nTheta;
+                gc.push( p3( o.x + R_real*Math.sin( theta )*Math.cos( phi ), 
+                             o.y + R_real*Math.sin( theta )*Math.sin( phi ), 
+                             o.z + R_real*Math.cos( theta ) ) );
+            }
+            construction_lines.push( gc );
+        }
+        // lines of latitude
+        nTheta = 10;
+        nPhi = 100;
+        for( var iTheta = 0; iTheta < nTheta; ++iTheta ) {
+            var theta = iTheta * Math.PI / nTheta;
+            var gc = [];
+            for( var iPhi = 0; iPhi <= nPhi; ++iPhi ) {
+                var phi = iPhi * 2.0 * Math.PI / nPhi;
+                gc.push( p3( o.x + R_real*Math.sin( theta )*Math.cos( phi ), 
+                             o.y + R_real*Math.sin( theta )*Math.sin( phi ), 
+                             o.z + R_real*Math.cos( theta ) ) );
+            }
+            construction_lines.push( gc );
+        }
+    }
+    else {
+        // lines of latitude
+        var nTheta = 100;
+        var nR = 10;
+        for( var iR = 1; iR < nR; ++iR ) {
+            var r = iR * 2.0 * R_real / nR;
+            var cl = [];
+            for( var iTheta = 0; iTheta <= nTheta; ++iTheta ) {
+                var theta = iTheta * 2.0 * Math.PI / nTheta;
+                var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
+                p = reflect( p, surface );
+                cl.push( p );
+            }
+            construction_lines.push( cl );
+        }
+        nTheta = 10;
+        var nR = 100;
+        for( var iTheta = 0; iTheta <= nTheta; ++iTheta ) {
+            var theta = iTheta * 2.0 * Math.PI / nTheta;
+            var cl = [];
+            for( var iR = 0; iR < nR; ++iR ) {
+                var r = iR * 2.0 * R_real / nR;
+                var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
+                p = reflect( p, surface );
+                cl.push( p );
+            }
+            construction_lines.push( cl );
+        }
+        // (lower sheet)
+        nTheta = 100;
+        nR = 50;
+        for( var iR = 1; iR < nR; ++iR ) {
+            var r = 2.0 * R_real + iR * R_real * 0.5;
+            var cl = [];
+            for( var iTheta = 0; iTheta <= nTheta; ++iTheta ) {
+                var theta = iTheta * 2.0 * Math.PI / nTheta;
+                var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
+                p = reflect( p, surface );
+                cl.push( p );
+            }
+            construction_lines.push( cl );
+        }
+        nTheta = 10;
+        var nR = 50;
+        for( var iTheta = 0; iTheta <= nTheta; ++iTheta ) {
+            var theta = iTheta * 2.0 * Math.PI / nTheta;
+            var cl = [];
+            for( var iR = 1; iR < nR; ++iR ) {
+                var r = 2.0 * R_real + iR * 20.0 * R_real / nR;
+                var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
+                p = reflect( p, surface );
+                cl.push( p );
+            }
+            construction_lines.push( cl );
+        }
+    }
+
+    // project the mesh onto the screen
+    for( var iFace = 0; iFace < faces.length; ++iFace ) {
+        var face = faces[ iFace ];
+        for( var iVert = 0; iVert < face.length; ++iVert ) {
+            face[ iVert ] = camera_projection( face[ iVert ], camera );
+        }
+    }
+    for( var iLine = 0; iLine < lines.length; ++iLine ) {
+        var line = lines[ iLine ];
+        for( var iVert = 0; iVert < line.length; ++iVert ) {
+            line[ iVert ] = camera_projection( line[ iVert ], camera );
+        }
+    }
+    for( var iLine = 0; iLine < construction_lines.length; ++iLine ) {
+        var line = construction_lines[ iLine ];
+        for( var iVert = 0; iVert < line.length; ++iVert ) {
+            line[ iVert ] = camera_projection( line[ iVert ], camera );
+        }
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+    // draw the mesh
+    // (first the faces, then the edges, else the wrong z-ordering breaks things)
+    ctx.fillStyle = "rgba(200,210,255,0.1)";
+    for( var iFace = 0; iFace < faces.length; ++iFace ) {
+        ctx.beginPath();
+        traverse( faces[ iFace ] );
+        ctx.fill();
+    }
+    ctx.strokeStyle = "rgba(0,0,0,0.5)";
+    ctx.beginPath();
+    for( var iFace = 0; iFace < faces.length; ++iFace )
+        traverse( faces[ iFace ] );
+    ctx.stroke();
+    // draw the free lines
+    ctx.strokeStyle = "rgba(0,0,0,1)";
+    ctx.beginPath();
+    for( var iLine = 0; iLine < lines.length; ++iLine ) {
+        traverse( lines[ iLine ] );
+    }
+    ctx.stroke();
+    // draw the construction lines
+    ctx.strokeStyle = "rgba(0,0,0,0.1)";
+    ctx.beginPath();
+    for( var iLine = 0; iLine < construction_lines.length; ++iLine ) {
+        traverse( construction_lines[ iLine ] );
+    }
+    ctx.stroke();
+    
+    // add some labelled points
+    ctx.fillStyle = "rgb(0,0,0)";
+    ctx.font="12px Verdana";
+    point( camera_projection( s, camera ), 'S' );
+    point( camera_projection( o, camera ), 'O' );
+    point( camera_projection( p3(0,0,0), camera ), 'C' );
+    point( camera_projection( A, camera ), 'A' );
+    point( camera_projection( B, camera ), 'B' );
+    point( camera_projection( D, camera ), 'D' );
+    point( camera_projection( M, camera ), 'M' );
+}
+
+function drawRect( x, y, w, h ) {
+    ctx.beginPath();
+    ctx.rect( x, y, w, h );
+    ctx.fill();
+    ctx.stroke();
+}
+
+function sign( x ) {
+    return x?x<0?-1:1:0;
+}
+
+function drawUI() {
+    // draw the sliders
+    ctx.strokeStyle="rgb(0,0,0)";
+    for( var iSlider = 0; iSlider < sliders.length; ++iSlider ) {
+        var slider = sliders[ iSlider ];
+        ctx.fillStyle="rgb(255,255,255)";
+        drawRect( slider.x, slider.y + slider.height/3, slider.width, slider.height/3 ); // rail
+        if( iActiveSlider == iSlider )
+            ctx.fillStyle="rgb(100,100,255)";
+        var handle_radius = 5;
+        slider.handle_rect = { x:slider.x+slider.width*slider.value-handle_radius, y:slider.y, width:handle_radius*2+1, height:slider.height };
+        drawRect( slider.handle_rect.x, slider.handle_rect.y, slider.handle_rect.width, slider.handle_rect.height );
+    }
+}
+
+function animate() {
+    if( isSpinning ) {
+        // rotate round
+        theta += 0.01;
+        repositionCamera();
+    }
+    redraw();
+    requestAnimationFrame( animate );
+}
+
+window.onload = init;
+</script>
+
+<noscript>
+<p>For full functionality of this site it is necessary to enable JavaScript.
+Here are the <a href="http://www.enable-javascript.com/" target="_blank">
+instructions how to enable JavaScript in your web browser</a>.
+</p></noscript>
+
+</head>
+
+<body>
+
+<p align="center"><canvas id="canvas" width="1000" height="600">(Canvas drawing not supported by your browser.)</canvas></p>
+
+</html>
+
