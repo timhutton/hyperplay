@@ -146,9 +146,9 @@ function redraw() {
         ctx.fillStyle = homeFillStyle;
         var step = Math.abs( R ) / 100.0;
         ctx.beginPath();
-        var x = -2.0 * Math.abs(R) + step;
+        var x = -1.9 * Math.abs(R) + step;
         moveTo( reflect( p3(x,0,0), inversion  ) );
-        for( ; x <= 2.0 * Math.abs(R); x += step )
+        for( ; x < 1.9 * Math.abs(R); x += step )
             lineTo( reflect( p3(x,0,0), inversion ) );
         ctx.fill();
         ctx.stroke();
