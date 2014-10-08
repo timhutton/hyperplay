@@ -215,6 +215,7 @@ function drawMesh() {
     // define the main sphere inversion that takes us between the curved surface and the stereographic plane
     var f = curvatureFromSliderPos( sliders[ 0 ].value );
     var R_squared = 1.0 / f;
+    if( Math.abs( f ) < 1e-6 ) R_squared = 1.0 / 1e-6;
     var R_real = sign( R_squared ) * Math.sqrt( Math.abs( R_squared ) );
     var o = p3(0,0,R_real);
     var s = mul( o, 2.0 );
