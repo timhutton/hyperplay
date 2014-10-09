@@ -190,6 +190,7 @@ function traverse( points ) {
 }
 
 function point( p, t ) { 
+    if( p.z < 0.1 ) return;
     ctx.beginPath(); 
     ctx.arc( p.x, p.y, 2, 0, 2.0 * Math.PI ); 
     ctx.fillText( t, p.x + 3, p.y - 3 );
