@@ -17,30 +17,10 @@ function sub( a, b ) { return p3( a.x - b.x, a.y - b.y, a.z - b.z ); }
 function mul( a, f ) { return p3( a.x * f, a.y * f, a.z * f ); }
 function dot( a, b ) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 function len2( a ) { return dot(a,a); }
-function dist2( a, b ) { return len2( sub( a, b ) ); }
 function dist( a, b ) { return Math.sqrt( len2( sub( a, b ) ) ); }
 function assign( a, b ) { a.x = b.x; a.y = b.y; a.z = b.z; }
 function normalize( a ) { return mul( a, 1 / Math.sqrt( len2( a ) ) ); }
 function cross( a, b ) { return p3( a.y * b.z - a.z * b.y, a.z*b.x - a.x * b.z, a.x * b.y - a.y * b.x ); }
-function perp2D( a ) { return p3( -a.y, a.x, 0 ); }
-function lineWithLineIntersection2D( p0, v0, p1, v1, epsilon ) {
-    // http://stackoverflow.com/a/4977569/126823
-    var x00 = p0.x;
-    var y00 = p0.y;
-    var x10 = p1.x;
-    var y10 = p1.y;
-    var x01 = v0.x;
-    var y01 = v0.y;
-    var x11 = v1.x;
-    var y11 = v1.y;
-    var det = x11 * y01 - x01 * y11;
-    if( Math.abs( det ) < epsilon ) {
-        return { test:false }; // lines parallel or colinear
-    }
-    var t = -(-(x00-x10)*y11 + (y00-y10)*x11 ) / det;    // ip = p0 + t*v0
-    var s =  ( (x00-x10)*y01 - (y00-y10)*x01 ) / det;    // ip = p1 + s*v1
-    return { test:true, p:add(p0,mul(v0,t)), u1:t, u2:s };
-}
 function inversion_sphere_from_line_and_two_points( a, b, p1, p2 ) {
     // What is the sphere which has center on a line a-b and surface passing through points p1 and p2?
     // Find the intersection between the line and the plane halfway between p1 and p2 (we assume a solution exists)
@@ -93,11 +73,11 @@ var view_height;
 var camera;
 var sliders;
 var iActiveSlider;
-var curvatureRange = 1.99;
+var curvatureRange = 2;
 var isSpinning = true;
 
-function curvatureFromSliderPos( v ) { return ( v - 1 ) * curvatureRange; }
-function sliderPosFromCurvature( f ) { return f / curvatureRange + 1; }
+function curvatureFromSliderPos( v ) { return ( v - 0.5 ) * curvatureRange; }
+function sliderPosFromCurvature( f ) { return f / curvatureRange + 0.5; }
 
 function getMousePos(canvas, evt) {
     var rect = canvas.getBoundingClientRect();
@@ -110,7 +90,7 @@ function onMouseMove( evt ) {
         var slider = sliders[ iActiveSlider ];
         slider.value = Math.min( 1, Math.max( 0, ( pos.x - slider.x ) / slider.width ) );
     }
-    //view_height = ( canvas.height / 2.0 - pos.y ) / canvas.height;
+    view_height = ( canvas.height / 2.0 - pos.y ) / canvas.height;
     repositionCamera();
 }
 
@@ -132,25 +112,15 @@ function onMouseUp( evt ) {
 }
 
 function repositionCamera() {
-    if( false ) {
-        // 3D view
-        var look_at = p3(0,0,0);
-        var d = 15;
-        var vd = d * view_height;
-        var hd = Math.sqrt( d*d - vd*vd );
-        camera.p = p3( hd*Math.cos(theta), hd*Math.sin(theta), vd  );
-        camera.z = normalize( sub( look_at, camera.p ) );
-        var up = p3(0,0,1);
-        camera.x = normalize( cross( camera.z, up ) );
-        camera.y = normalize( cross( camera.x, camera.z ) );
-    }
-    else {
-        // 2D view
-        camera.p = p3(0,0,-5);
-        camera.x = p3(1,0,0);
-        camera.y = p3(0,1,0);
-        camera.z = p3(0,0,1);
-    }
+    var look_at = p3(0,0,0);
+    var d = 20;
+    var vd = d * view_height;
+    var hd = Math.sqrt( d*d - vd*vd );
+    camera.p = p3( hd*Math.cos(theta), hd*Math.sin(theta), vd  );
+    camera.z = normalize( sub( look_at, camera.p ) );
+    var up = p3(0,0,1);
+    camera.x = normalize( cross( camera.z, up ) );
+    camera.y = normalize( cross( camera.x, camera.z ) );
 }
 
 function pointInRect( p, rect ) {
@@ -163,7 +133,7 @@ function init() {
     ctx = canvas.getContext('2d');
 
     sliders = [];
-    sliders[0] = { x: 300, y:10, width:canvas.width-600, height:20, value:sliderPosFromCurvature(-0.398), handle_rect:{} };
+    sliders[0] = { x: 10, y:10, width:canvas.width-20, height:20, value:sliderPosFromCurvature(0.3), handle_rect:{} };
     isActiveSlider = -1;
     
     theta = Math.PI / 2;
@@ -229,68 +199,53 @@ function point( p, t ) {
 
 function drawMesh() {
 
-    var NS = 3;
-    var depth = 9 - NS;
+    var N = 4;
+    var depth = 1;
 
     var f = curvatureFromSliderPos( sliders[ 0 ].value );
-
-    var R_real = null;
-    var r_poincare = null;
-    var R_polygon = null;
+    var R_real;
+    var R_poincare;
+    var R_polygon;
     if( false ) {
         // keep the polygon fixed and determine the poincare disk size from the curvature
         R_real = 2.0 / f;
         if( Math.abs( f ) < 1e-6 ) R_real = 1.0 / 1e-6;
-        r_poincare = 2.0 * R_real;
+        R_poincare = 2.0 * R_real;
         R_polygon = 2;
     }
     else {
         // keep the poincare disk size fixed and determine the size of the polygon from the curvature
-        R_real = sign(f) * 1.0;
-        r_poincare = 2.0 * R_real;
+        R_real = sign(f) * 3.0;
+        R_poincare = 2.0 * R_real;
         R_polygon = f * R_real;
     }
+
+    var faces = [];
+    var special_lines = [];
+    var lines = [];
+    var construction_lines = [];
     
     // define our base polygon
     var polygon = [];
-    for( var i = 0; i < NS; ++i ) {
-        polygon.push( p3( R_polygon * Math.cos( i * 2.0 * Math.PI / NS ), R_polygon * Math.sin( i * 2.0 * Math.PI / NS, 0 ), 0 ) );
+    for( var i = 0; i < N; ++i ) {
+        polygon.push( p3( R_polygon * Math.cos( i * 2.0 * Math.PI / N ), R_polygon * Math.sin( i * 2.0 * Math.PI / N, 0 ), 0 ) );
     }
-    
     var R_squared = sign( R_real ) * R_real * R_real;
-    var o = p3(0,0,R_real);
+    var o = p3(0,0,Math.abs( R_real ) );
     var s = mul( o, 2.0 );
     var surface = { type:MirrorType.SPHERE, p:s, r2:4.0*R_squared, metric_signature:p3(1,1,sign(R_squared)) };
     var central_mirror = { type:MirrorType.POINT, p:o };
 
-    var faces = [];
-    var lines = [];
-    
     var A = polygon[ 0 ];
     var B = reflect( A, surface );
     var D = reflect( B, central_mirror );
     var M = reflect( D, surface );
+    lines.push( [ B, D, s, M ] );
     var A2 = polygon[ 1 ];
     var B2 = reflect( A2, surface );
     var D2 = reflect( B2, central_mirror );
     var M2 = reflect( D2, surface );
-    var IC0_p = null;
-    var IC0_r = null;
-    var L = polygon[2];
-    var P = null;
-    if( NS > 3 )
-        P = polygon[3];
-    var M = null;
-    var M2 = null;
-    var N = null;
-    var N2 = null;
-    var N3 = null;
-    var E = null;
-    var F = null;
-    var G = null;
-    var IC1 = null;
-    var IC2p = null;
-    var IC2 = null;
+    lines.push( [ B2, D2, s, M2 ] );
 
     var mirrors = [];
     // for each edge, construct its projection onto the curved surface and its circle of inversion in the plane
@@ -327,62 +282,32 @@ function drawMesh() {
             geodesic_segment_projected_mirrored.push( p_curved_projected_mirrored );
             geodesic_segment_mirrored.push( p_curved_mirrored );
         }
-        // draw the inversion circle IC0 on the plane
-        var icp = [];
-        var r = Math.sqrt( ic.r2 );
+        construction_lines.push( [ a, s, ap ] );
+        construction_lines.push( [ b, s, bp ] );
         if( iVert == 0 ) {
-            IC0 = { type:MirrorType.SPHERE, p:ic.p, r2:ic.r2, metric_signature:p3(1,1,1) };
-            E = reflect( L, ic );
-            if( NS > 3 )
-                F = reflect( P, ic );
-        }
-        for( var i = 0; i <= npc; ++i )
-            icp.push( p3( ic.p.x + r*Math.cos( i * 2.0 * Math.PI / npc ), ic.p.y + r*Math.sin( i * 2.0 * Math.PI / npc ), 0 ) );
-        icp.push( icp[0] );
-        lines.push( icp );
-        if( R_squared > 0 ) 
-        {
-            // draw the inversion circle on the sphere
-            var icps = [];
-            for( var i = 0; i < icp.length; ++i )
-                icps.push( reflect( icp[ i ], surface ) );
-            lines.push( icps );
-        }
-        if(iVert==1 && NS > 4) {
-            M = reflect( polygon[3], ic );
-            M2 = reflect( polygon[4], ic );
-        }
-    }
-    if( NS > 4 ) {
-        N = reflect( M, IC0 );
-        N2 = reflect( M2, IC0 );
-        G = lineWithLineIntersection2D( mul( add( F, E ), 0.5 ), perp2D( sub( F, E ) ), mul( add( N, E ), 0.5 ), perp2D( sub( N, E ) ) ).p;
-        // now we can construct the second inversion circle
-        IC1 = { type:MirrorType.SPHERE, p:G, r2:dist2(G,E), metric_signature:p3(1,1,1) };
-        N3 = reflect( N2, IC1 );
-        IC2p = lineWithLineIntersection2D( mul( add( N2, N ), 0.5 ), perp2D( sub( N2, N ) ), mul( add( N3, N ), 0.5 ), perp2D( sub( N3, N ) ) ).p;
-        IC2 = { type:MirrorType.SPHERE, p:IC2p, r2:dist2(IC2p,N), metric_signature:p3(1,1,1) };
-        // draw the inversion circle IC1 on the plane
-        {
+            special_lines.push( geodesic_segment );
+            special_lines.push( geodesic_segment_projected );
+            special_lines.push( geodesic_segment_projected_mirrored );
+            special_lines.push( geodesic_segment_mirrored );
+            // draw the inversion circle on the plane
             var icp = [];
-            var r = Math.sqrt( IC1.r2 );
+            var r = Math.sqrt( ic.r2 );
             for( var i = 0; i <= npc; ++i )
-                icp.push( p3( IC1.p.x + r*Math.cos( i * 2.0 * Math.PI / npc ), IC1.p.y + r*Math.sin( i * 2.0 * Math.PI / npc ), 0 ) );
+                icp.push( p3( ic.p.x + r*Math.cos( i * 2.0 * Math.PI / npc ), ic.p.y + r*Math.sin( i * 2.0 * Math.PI / npc ), 0 ) );
             icp.push( icp[0] );
             lines.push( icp );
-        }
-        // draw the inversion circle IC2 on the plane
-        {
-            var icp = [];
-            var r = Math.sqrt( IC2.r2 );
-            for( var i = 0; i <= npc; ++i )
-                icp.push( p3( IC2.p.x + r*Math.cos( i * 2.0 * Math.PI / npc ), IC2.p.y + r*Math.sin( i * 2.0 * Math.PI / npc ), 0 ) );
-            icp.push( icp[0] );
-            lines.push( icp );
+            if( R_squared > 0 ) 
+            {
+                // draw the inversion circle on the sphere
+                var icps = [];
+                for( var i = 0; i < icp.length; ++i )
+                    icps.push( reflect( icp[ i ], surface ) );
+                lines.push( icps );
+            }
         }
     }
     faces.push( curved_polygon );
-
+    faces.push( curved_polygon_projected );
     // reflect the face in all the mirrors
     for( var iMirror = 0; iMirror < mirrors.length; ++iMirror ) {
         var face2 = [];
@@ -395,6 +320,12 @@ function drawMesh() {
             face2_projected.push( pp );
         }
         faces.push( face2 );
+        faces.push( face2_projected );
+        // also add construction lines for the base polygon
+        for( var iVert = 0; iVert < polygon.length; ++iVert ) {
+            var p = reflect( polygon[ iVert ], mirrors[ iMirror ] );
+            construction_lines.push( [ p, s ] );
+        }
         // then reflect those faces in the mirrors again
         if( depth > 1 ) {
             for( var iMirror2 = 0; iMirror2 < mirrors.length; ++iMirror2 ) {
@@ -408,77 +339,112 @@ function drawMesh() {
                     face3_projected.push( pp );
                 }
                 faces.push( face3 );
-                // then reflect those faces in the mirrors again
-                if( depth > 2 ) {
-                    for( var iMirror3 = 0; iMirror3 < mirrors.length; ++iMirror3 ) {
-                        if( iMirror3 == iMirror2 ) continue; // no point returning to the start again
-                        var face4 = [];
-                        var face4_projected = [];
-                        for( var iVert = 0; iVert < face3.length; ++iVert ) {
-                            var p = reflect( face3[ iVert ], mirrors[ iMirror3 ] );
-                            var pp = reflect( p, surface );
-                            face4.push( p );
-                            face4_projected.push( pp );
-                        }
-                        faces.push( face4 );
-                        // then reflect those faces in the mirrors again
-                        if( depth > 3 ) {
-                            for( var iMirror4 = 0; iMirror4 < mirrors.length; ++iMirror4 ) {
-                                if( iMirror4 == iMirror3 ) continue; // no point returning to the start again
-                                var face5 = [];
-                                var face5_projected = [];
-                                for( var iVert = 0; iVert < face4.length; ++iVert ) {
-                                    var p = reflect( face4[ iVert ], mirrors[ iMirror4 ] );
-                                    var pp = reflect( p, surface );
-                                    face5.push( p );
-                                    face5_projected.push( pp );
-                                }
-                                faces.push( face5 );
-                                // then reflect those faces in the mirrors again
-                                if( depth > 4 ) {
-                                    for( var iMirror5 = 0; iMirror5 < mirrors.length; ++iMirror5 ) {
-                                        if( iMirror5 == iMirror4 ) continue; // no point returning to the start again
-                                        var face6 = [];
-                                        var face6_projected = [];
-                                        for( var iVert = 0; iVert < face5.length; ++iVert ) {
-                                            var p = reflect( face5[ iVert ], mirrors[ iMirror5 ] );
-                                            var pp = reflect( p, surface );
-                                            face6.push( p );
-                                            face6_projected.push( pp );
-                                        }
-                                        faces.push( face6 );
-                                        // then reflect those faces in the mirrors again
-                                        if( depth > 5 ) {
-                                            for( var iMirror6 = 0; iMirror6 < mirrors.length; ++iMirror6 ) {
-                                                if( iMirror6 == iMirror5 ) continue; // no point returning to the start again
-                                                var face7 = [];
-                                                var face7_projected = [];
-                                                for( var iVert = 0; iVert < face6.length; ++iVert ) {
-                                                    var p = reflect( face6[ iVert ], mirrors[ iMirror6 ] );
-                                                    var pp = reflect( p, surface );
-                                                    face7.push( p );
-                                                    face7_projected.push( pp );
-                                                }
-                                                faces.push( face7 );
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                faces.push( face3_projected );
+                // also add construction lines for the base polygon
+                for( var iVert = 0; iVert < polygon.length; ++iVert ) {
+                    var p = reflect( polygon[ iVert ], mirrors[ iMirror ] );
+                    p = reflect( p, mirrors[ iMirror2 ] );
+                    construction_lines.push( [ p, s ] );
                 }
             }
         }
     }
-    // draw the boundary of the Poincare disk
-    var circle_lines = [];
-    var pd = [];
-    var nppd = 80;
-    for( var i = 0; i <= nppd; ++i )
-        pd.push( p3( r_poincare*Math.cos( i * 2.0 * Math.PI / nppd ), r_poincare*Math.sin( i * 2.0 * Math.PI / nppd ), 0 ) );
-    pd.push( pd[0] );
-    circle_lines.push( pd );
+    // the sphere
+    if( R_real > 0 )
+    {
+        // lines of longitude
+        var nTheta = 100;
+        var nPhi = 10;
+        for( var iPhi = 0; iPhi < nPhi; ++iPhi ) {
+            var phi = iPhi * Math.PI / nPhi;
+            var gc = [];
+            for( var iTheta = 0; iTheta <= nTheta; ++iTheta ) {
+                var theta = iTheta * 2.0 * Math.PI / nTheta;
+                gc.push( p3( o.x + R_real*Math.sin( theta )*Math.cos( phi ), 
+                             o.y + R_real*Math.sin( theta )*Math.sin( phi ), 
+                             o.z + R_real*Math.cos( theta ) ) );
+            }
+            construction_lines.push( gc );
+        }
+        // lines of latitude
+        nTheta = 10;
+        nPhi = 100;
+        for( var iTheta = 0; iTheta < nTheta; ++iTheta ) {
+            var theta = iTheta * Math.PI / nTheta;
+            var gc = [];
+            for( var iPhi = 0; iPhi <= nPhi; ++iPhi ) {
+                var phi = iPhi * 2.0 * Math.PI / nPhi;
+                gc.push( p3( o.x + R_real*Math.sin( theta )*Math.cos( phi ), 
+                             o.y + R_real*Math.sin( theta )*Math.sin( phi ), 
+                             o.z + R_real*Math.cos( theta ) ) );
+            }
+            construction_lines.push( gc );
+        }
+    }
+    if( R_real < 0 ) // the hyperboloid
+    {
+        // lines of latitude
+        var nTheta = 100;
+        var nR = 10;
+        for( var iR = 1; iR < nR; ++iR ) {
+            var r = iR * 2.0 * R_real / nR;
+            var cl = [];
+            for( var iTheta = 0; iTheta <= nTheta; ++iTheta ) {
+                var theta = iTheta * 2.0 * Math.PI / nTheta;
+                var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
+                p = reflect( p, surface );
+                cl.push( p );
+            }
+            construction_lines.push( cl );
+        }
+        nTheta = 10;
+        var nR = 100;
+        for( var iTheta = 0; iTheta <= nTheta; ++iTheta ) {
+            var theta = iTheta * 2.0 * Math.PI / nTheta;
+            var cl = [];
+            for( var iR = 0; iR < nR; ++iR ) {
+                var r = iR * 2.0 * R_real / nR;
+                var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
+                p = reflect( p, surface );
+                cl.push( p );
+            }
+            construction_lines.push( cl );
+        }
+        // (lower sheet)
+        nTheta = 100;
+        nR = 50;
+        for( var iR = 1; iR < nR; ++iR ) {
+            var r = 2.0 * R_real + Math.pow( 1.5, iR ) * R_real * 10.0 / nR;
+            var cl = [];
+            for( var iTheta = 0; iTheta <= nTheta; ++iTheta ) {
+                var theta = iTheta * 2.0 * Math.PI / nTheta;
+                var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
+                p = reflect( p, surface );
+                cl.push( p );
+            }
+            construction_lines.push( cl );
+        }
+        nTheta = 10;
+        var nR = 50;
+        for( var iTheta = 0; iTheta <= nTheta; ++iTheta ) {
+            var theta = iTheta * 2.0 * Math.PI / nTheta;
+            var cl = [];
+            for( var iR = 1; iR < nR; ++iR ) {
+                var r = 2.0 * R_real + Math.pow( 1.5, iR ) * R_real * 10.0 / nR;
+                var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
+                p = reflect( p, surface );
+                cl.push( p );
+            }
+            construction_lines.push( cl );
+        }
+        // draw the boundary of the Poincare disk
+        var pd = [];
+        var nppd = 40;
+        for( var i = 0; i <= nppd; ++i )
+            pd.push( p3( R_poincare*Math.cos( i * 2.0 * Math.PI / nppd ), R_poincare*Math.sin( i * 2.0 * Math.PI / nppd ), 0 ) );
+        pd.push( pd[0] );
+        lines.push( pd );
+    }
 
     // project the mesh onto the screen
     for( var iFace = 0; iFace < faces.length; ++iFace ) {
@@ -487,15 +453,21 @@ function drawMesh() {
             face[ iVert ] = camera_projection( face[ iVert ], camera );
         }
     }
+    for( var iLine = 0; iLine < special_lines.length; ++iLine ) {
+        var line = special_lines[ iLine ];
+        for( var iVert = 0; iVert < line.length; ++iVert ) {
+            line[ iVert ] = camera_projection( line[ iVert ], camera );
+        }
+    }
     for( var iLine = 0; iLine < lines.length; ++iLine ) {
         var line = lines[ iLine ];
         for( var iVert = 0; iVert < line.length; ++iVert ) {
             line[ iVert ] = camera_projection( line[ iVert ], camera );
         }
     }
-    for( var iLine = 0; iLine < circle_lines.length; ++iLine ) {
-        var line = circle_lines[ iLine ];
-        for( var iVert = 0; iVert < line.length; ++iVert ) {
+    for( var iLine = 0; iLine < construction_lines.length; ++iLine ) {
+        var line = construction_lines[ iLine ];
+        for( var iVert = 0; iVert < line.length; ++iVert ) {    
             line[ iVert ] = camera_projection( line[ iVert ], camera );
         }
     }
@@ -503,83 +475,55 @@ function drawMesh() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
-    if( true ) {
-        // draw the mesh
-        // (first the faces, then the edges, else the wrong z-ordering breaks things)
-        ctx.fillStyle = "rgba(200,210,255,0.2)";
-        for( var iFace = 0; iFace < faces.length; ++iFace ) {
-            ctx.beginPath();
-            traverse( faces[ iFace ] );
-            ctx.fill();
-        }
-        ctx.strokeStyle = "rgba(0,0,0,0.7)";
+    // draw the mesh
+    // (first the faces, then the edges, else the wrong z-ordering breaks things)
+    ctx.fillStyle = "rgba(200,210,255,0.2)";
+    for( var iFace = 0; iFace < faces.length; ++iFace ) {
         ctx.beginPath();
-        for( var iFace = 0; iFace < faces.length; ++iFace )
-            traverse( faces[ iFace ] );
-        ctx.stroke();
+        traverse( faces[ iFace ] );
+        ctx.fill();
     }
-    
-    // draw the Poincare disk
     ctx.strokeStyle = "rgba(0,0,0,0.7)";
     ctx.beginPath();
-    for( var iLine = 0; iLine < circle_lines.length; ++iLine ) {
-        traverse( circle_lines[ iLine ] );
+    for( var iFace = 0; iFace < faces.length; ++iFace )
+        traverse( faces[ iFace ] );
+    ctx.stroke();
+    // draw the special lines
+    ctx.strokeStyle = "rgba(0,127,0,0.7)";
+    ctx.beginPath();
+    for( var iLine = 0; iLine < special_lines.length; ++iLine ) {
+        traverse( special_lines[ iLine ] );
+    }
+    ctx.stroke();
+    // draw the free lines
+    ctx.strokeStyle = "rgba(0,0,0,0.3)";
+    ctx.beginPath();
+    for( var iLine = 0; iLine < lines.length; ++iLine ) {
+        traverse( lines[ iLine ] );
+    }
+    ctx.stroke();
+    // draw the construction lines
+    ctx.strokeStyle = "rgba(0,0,0,0.1)";
+    ctx.beginPath();
+    for( var iLine = 0; iLine < construction_lines.length; ++iLine ) {
+        traverse( construction_lines[ iLine ] );
     }
     ctx.stroke();
     
-    if( false ) {
-        // draw the free lines
-        ctx.strokeStyle = "rgba(0,0,0,0.3)";
-        ctx.beginPath();
-        for( var iLine = 0; iLine < lines.length; ++iLine ) {
-            traverse( lines[ iLine ] );
-        }
-        ctx.stroke();
-    }
-
-    if( false ) {
-        // add some labelled points
-        ctx.fillStyle = "rgba(0,0,0,0.9)";
-        ctx.font="12px Verdana";
-        point( camera_projection( p3(0,0,0), camera ), 'C' );
-        point( camera_projection( A, camera ), 'A' );
-        point( camera_projection( A2, camera ), 'A\'' );
-        
-        point( camera_projection( E, camera ), 'E' );
-        if( NS > 3 ) {
-            point( camera_projection( F, camera ), 'F' );
-            point( camera_projection( P, camera ), 'P' );
-        }
-        point( camera_projection( L, camera ), 'L' );
-        point( camera_projection( IC0.p, camera ), 'IC0.p' );
-        if( NS > 4 ) {
-            point( camera_projection( M, camera ), 'M' );
-            point( camera_projection( M2, camera ), 'M2' );
-            point( camera_projection( N, camera ), 'N' );
-            point( camera_projection( N2, camera ), 'N2' );
-            point( camera_projection( N3, camera ), 'N3' );
-            point( camera_projection( G, camera ), 'G' );
-            point( camera_projection( IC2.p, camera ), 'IC2.p' );
-        }
-    }
-    
-    // Log things for making a rangoli
-    console.log( 'Radius of the base circle: '+Math.abs(2.0 * r_poincare).toString());
-    console.log( 'Distance of the base polygon vertices: '+dist(A,p3(0,0,0)).toString());
-    console.log( 'Edge length of the base polygon: '+dist(A,A2).toString());
-    console.log( 'Radius of the first inversion circle: '+Math.sqrt(IC0.r2).toString());
-    console.log( 'Distance of the center of the first inversion circle: '+dist(IC0.p,p3(0,0,0)).toString());
-    console.log( 'Distance CE: '+dist(E,p3(0,0,0)).toString());
-    if( NS > 3 ) {
-        console.log( 'Distance CF: '+dist(F,p3(0,0,0)).toString());
-    }
-    if( NS > 4 ) {
-        console.log( 'Distance CG: '+dist(G,p3(0,0,0)).toString());
-        console.log( 'Distance FG: '+dist(G,F).toString());
-        console.log( 'Distance CN: '+dist(N,p3(0,0,0)).toString());
-        console.log( 'Distance CQ: '+dist(IC2.p,p3(0,0,0)).toString());
-        console.log( 'Distance QN: '+dist(IC2.p,N).toString());
-    }
+    // add some labelled points
+    ctx.fillStyle = "rgba(0,0,0,0.9)";
+    ctx.font="12px Verdana";
+    point( camera_projection( s, camera ), 'S' );
+    point( camera_projection( o, camera ), 'O' );
+    point( camera_projection( p3(0,0,0), camera ), 'C' );
+    point( camera_projection( A, camera ), 'A' );
+    point( camera_projection( B, camera ), 'B' );
+    point( camera_projection( D, camera ), 'D' );
+    point( camera_projection( M, camera ), 'M' );
+    point( camera_projection( A2, camera ), 'A\'' );
+    point( camera_projection( B2, camera ), 'B\'' );
+    point( camera_projection( D2, camera ), 'D\'' );
+    point( camera_projection( M2, camera ), 'M\'' );
 }
 
 function drawRect( x, y, w, h ) {
@@ -631,14 +575,22 @@ instructions how to enable JavaScript in your web browser</a>.
 
 <body>
 
-<p><b>Controls:</b> Use the slider to change the curvature.</p>
+<p><b>Controls:</b> Move the mouse up and down to move the viewpoint up and down. Click to stop and start the spinning. Use the slider to change the curvature.</p>
 
 <p align="center"><canvas id="canvas" width="1000" height="600">(Canvas drawing not supported by your browser.)</canvas></p>
 
-<p>There's a version including positive curvature <a href="projection_2D.html">here</a>. To see the construction more clearly, there's a 1D version <a href="projection_and_mirroring.html">here</a>. To understand why negative curvature leads us to a hyperboloid, 
+<p>This is a demonstration of the connection between hyperbolic plane tiling and the polyhedra. By varying the curvature we can smoothly change between the hyperboloid model (projecting 
+onto the Poincar&eacute; disk) and the sphere (projecting onto the stereographic plane).</p>
+<p>The edge points A and A' are projected onto the curved surface at B and B' using stereographic projection from point S.</p>
+<p>Points B and B', together with the center of the curved surface at O, define a plane which intersects the curved surface to give the geodesic - the shortest path across the curved surface between B and B' is shown in green. 
+For a sphere this is part of a great circle. For the hyperboloid it is part of a hyperbola.</b>
+<p>Reflecting B and B' in point O gives the antipodal points D and D' that lie on the same plane. When the curvature is negative they lie on the lower sheet of the hyperboloid.</p>
+<p>We project D and D' onto the plane at M and M'. We now have four points A, A', M, M' that define a circle. Arcs in this circle are straight lines in the stereographic plane.</p>
+<p>We can use circle inversion to mirror things across the edges. We reflect our central tile across each of its edges in this way.</p>
+
+<p>To see the construction more clearly, there's a 1D version <a href="projection_and_mirroring.html">here</a>. To understand why negative curvature leads us to a hyperboloid, 
 there's an explanation <a href="generalized_stereographic_projection.html">here</a>. For exploring the many tilings of the sphere and hyperbolic plane, including hyperbolic space tessellations,
 there's a three-slider demo here: <a href="index_sliders.html">here</a>.</p>
 
 </html>
-
 
