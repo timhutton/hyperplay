@@ -93,7 +93,7 @@ var view_height;
 var camera;
 var sliders;
 var iActiveSlider;
-var curvatureRange = 2;
+var curvatureRange = 1.99;
 var isSpinning = true;
 
 function curvatureFromSliderPos( v ) { return ( v - 1 ) * curvatureRange; }
@@ -163,7 +163,7 @@ function init() {
     ctx = canvas.getContext('2d');
 
     sliders = [];
-    sliders[0] = { x: 150, y:10, width:canvas.width-300, height:20, value:sliderPosFromCurvature(-0.398), handle_rect:{} };
+    sliders[0] = { x: 300, y:10, width:canvas.width-600, height:20, value:sliderPosFromCurvature(-0.398), handle_rect:{} };
     isActiveSlider = -1;
     
     theta = Math.PI / 2;
