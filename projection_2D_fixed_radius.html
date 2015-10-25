@@ -73,7 +73,7 @@ var view_height;
 var camera;
 var sliders;
 var iActiveSlider;
-var curvatureRange = 2;
+var curvatureRange = 2.5;
 var isSpinning = true;
 
 function curvatureFromSliderPos( v ) { return ( v - 0.5 ) * curvatureRange; }
@@ -113,7 +113,7 @@ function onMouseUp( evt ) {
 
 function repositionCamera() {
     var look_at = p3(0,0,0);
-    var d = 20;
+    var d = 30;
     var vd = d * view_height;
     var hd = Math.sqrt( d*d - vd*vd );
     camera.p = p3( hd*Math.cos(theta), hd*Math.sin(theta), vd  );
@@ -199,8 +199,8 @@ function point( p, t ) {
 
 function drawMesh() {
 
-    var N = 4;
-    var depth = 1;
+    var N = 5;
+    var depth = 2;
 
     var f = curvatureFromSliderPos( sliders[ 0 ].value );
     var R_real;
@@ -234,18 +234,19 @@ function drawMesh() {
     var o = p3(0,0,Math.abs( R_real ) );
     var s = mul( o, 2.0 );
     var surface = { type:MirrorType.SPHERE, p:s, r2:4.0*R_squared, metric_signature:p3(1,1,sign(R_squared)) };
+    var surfaceH = { type:MirrorType.SPHERE, p:s, r2:Math.abs(4.0*R_squared), metric_signature:p3(-1,-1,1) };
     var central_mirror = { type:MirrorType.POINT, p:o };
 
     var A = polygon[ 0 ];
     var B = reflect( A, surface );
     var D = reflect( B, central_mirror );
     var M = reflect( D, surface );
-    lines.push( [ B, D, s, M ] );
+    //lines.push( [ B, D, s, M ] );
     var A2 = polygon[ 1 ];
     var B2 = reflect( A2, surface );
     var D2 = reflect( B2, central_mirror );
     var M2 = reflect( D2, surface );
-    lines.push( [ B2, D2, s, M2 ] );
+    //lines.push( [ B2, D2, s, M2 ] );
 
     var mirrors = [];
     // for each edge, construct its projection onto the curved surface and its circle of inversion in the plane
@@ -282,9 +283,9 @@ function drawMesh() {
             geodesic_segment_projected_mirrored.push( p_curved_projected_mirrored );
             geodesic_segment_mirrored.push( p_curved_mirrored );
         }
-        construction_lines.push( [ a, s, ap ] );
-        construction_lines.push( [ b, s, bp ] );
-        if( iVert == 0 ) {
+        //construction_lines.push( [ a, s, ap ] );
+        //construction_lines.push( [ b, s, bp ] );
+        /*if( iVert == 0 ) {
             special_lines.push( geodesic_segment );
             special_lines.push( geodesic_segment_projected );
             special_lines.push( geodesic_segment_projected_mirrored );
@@ -304,7 +305,7 @@ function drawMesh() {
                     icps.push( reflect( icp[ i ], surface ) );
                 lines.push( icps );
             }
-        }
+        }*/
     }
     faces.push( curved_polygon );
     faces.push( curved_polygon_projected );
@@ -324,7 +325,9 @@ function drawMesh() {
         // also add construction lines for the base polygon
         for( var iVert = 0; iVert < polygon.length; ++iVert ) {
             var p = reflect( polygon[ iVert ], mirrors[ iMirror ] );
+            var pp = reflect( p, surface );
             construction_lines.push( [ p, s ] );
+            construction_lines.push( [ pp, s ] );
         }
         // then reflect those faces in the mirrors again
         if( depth > 1 ) {
@@ -344,13 +347,15 @@ function drawMesh() {
                 for( var iVert = 0; iVert < polygon.length; ++iVert ) {
                     var p = reflect( polygon[ iVert ], mirrors[ iMirror ] );
                     p = reflect( p, mirrors[ iMirror2 ] );
+                    var pp = reflect( p, surface );
                     construction_lines.push( [ p, s ] );
+                    construction_lines.push( [ pp, s ] );
                 }
             }
         }
     }
     // the sphere
-    if( R_real > 0 )
+    //if( R_real > 0 )
     {
         // lines of longitude
         var nTheta = 100;
@@ -381,7 +386,7 @@ function drawMesh() {
             construction_lines.push( gc );
         }
     }
-    if( R_real < 0 ) // the hyperboloid
+    //if( R_real < 0 ) // the hyperboloid
     {
         // lines of latitude
         var nTheta = 100;
@@ -392,7 +397,7 @@ function drawMesh() {
             for( var iTheta = 0; iTheta <= nTheta; ++iTheta ) {
                 var theta = iTheta * 2.0 * Math.PI / nTheta;
                 var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
-                p = reflect( p, surface );
+                p = reflect( p, surfaceH );
                 cl.push( p );
             }
             construction_lines.push( cl );
@@ -405,7 +410,7 @@ function drawMesh() {
             for( var iR = 0; iR < nR; ++iR ) {
                 var r = iR * 2.0 * R_real / nR;
                 var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
-                p = reflect( p, surface );
+                p = reflect( p, surfaceH );
                 cl.push( p );
             }
             construction_lines.push( cl );
@@ -419,7 +424,7 @@ function drawMesh() {
             for( var iTheta = 0; iTheta <= nTheta; ++iTheta ) {
                 var theta = iTheta * 2.0 * Math.PI / nTheta;
                 var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
-                p = reflect( p, surface );
+                p = reflect( p, surfaceH );
                 cl.push( p );
             }
             construction_lines.push( cl );
@@ -432,7 +437,7 @@ function drawMesh() {
             for( var iR = 1; iR < nR; ++iR ) {
                 var r = 2.0 * R_real + Math.pow( 1.5, iR ) * R_real * 10.0 / nR;
                 var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
-                p = reflect( p, surface );
+                p = reflect( p, surfaceH );
                 cl.push( p );
             }
             construction_lines.push( cl );
@@ -511,7 +516,7 @@ function drawMesh() {
     ctx.stroke();
     
     // add some labelled points
-    ctx.fillStyle = "rgba(0,0,0,0.9)";
+    /*ctx.fillStyle = "rgba(0,0,0,0.9)";
     ctx.font="12px Verdana";
     point( camera_projection( s, camera ), 'S' );
     point( camera_projection( o, camera ), 'O' );
@@ -523,7 +528,7 @@ function drawMesh() {
     point( camera_projection( A2, camera ), 'A\'' );
     point( camera_projection( B2, camera ), 'B\'' );
     point( camera_projection( D2, camera ), 'D\'' );
-    point( camera_projection( M2, camera ), 'M\'' );
+    point( camera_projection( M2, camera ), 'M\'' );*/
 }
 
 function drawRect( x, y, w, h ) {
@@ -579,14 +584,8 @@ instructions how to enable JavaScript in your web browser</a>.
 
 <p align="center"><canvas id="canvas" width="1000" height="600">(Canvas drawing not supported by your browser.)</canvas></p>
 
-<p>This is a demonstration of the connection between hyperbolic plane tiling and the polyhedra. By varying the curvature we can smoothly change between the hyperboloid model (projecting 
+<p>This is a demonstration of the connection between hyperbolic plane tiling and the polyhedra. By varying the size of the initial polygon and the metric signature we can smoothly change between the hyperboloid model (projecting 
 onto the Poincar&eacute; disk) and the sphere (projecting onto the stereographic plane).</p>
-<p>The edge points A and A' are projected onto the curved surface at B and B' using stereographic projection from point S.</p>
-<p>Points B and B', together with the center of the curved surface at O, define a plane which intersects the curved surface to give the geodesic - the shortest path across the curved surface between B and B' is shown in green. 
-For a sphere this is part of a great circle. For the hyperboloid it is part of a hyperbola.</b>
-<p>Reflecting B and B' in point O gives the antipodal points D and D' that lie on the same plane. When the curvature is negative they lie on the lower sheet of the hyperboloid.</p>
-<p>We project D and D' onto the plane at M and M'. We now have four points A, A', M, M' that define a circle. Arcs in this circle are straight lines in the stereographic plane.</p>
-<p>We can use circle inversion to mirror things across the edges. We reflect our central tile across each of its edges in this way.</p>
 
 <p>To see the construction more clearly, there's a 1D version <a href="projection_and_mirroring.html">here</a>. To understand why negative curvature leads us to a hyperboloid, 
 there's an explanation <a href="generalized_stereographic_projection.html">here</a>. For exploring the many tilings of the sphere and hyperbolic plane, including hyperbolic space tessellations,
