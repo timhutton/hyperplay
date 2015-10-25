@@ -437,14 +437,14 @@ function drawMesh() {
             }
             construction_lines.push( cl );
         }
-        // draw the boundary of the Poincare disk
-        var pd = [];
-        var nppd = 40;
-        for( var i = 0; i <= nppd; ++i )
-            pd.push( p3( R_poincare*Math.cos( i * 2.0 * Math.PI / nppd ), R_poincare*Math.sin( i * 2.0 * Math.PI / nppd ), 0 ) );
-        pd.push( pd[0] );
-        lines.push( pd );
     }
+    // draw the boundary of the Poincare disk
+    var pd = [];
+    var nppd = 40;
+    for( var i = 0; i <= nppd; ++i )
+        pd.push( p3( R_poincare*Math.cos( i * 2.0 * Math.PI / nppd ), R_poincare*Math.sin( i * 2.0 * Math.PI / nppd ), 0 ) );
+    pd.push( pd[0] );
+    lines.push( pd );
 
     // project the mesh onto the screen
     for( var iFace = 0; iFace < faces.length; ++iFace ) {
