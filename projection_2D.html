@@ -218,7 +218,7 @@ function drawMesh() {
     var R_real = 1.0 / f;
     if( Math.abs( f ) < 1e-6 ) R_real = 1.0 / 1e-6;
     var R_squared = sign( R_real ) * R_real * R_real;
-    var o = p3(0,0,R_real);
+    var o = p3( 0, 0, Math.abs( R_real ) );
     var s = mul( o, 2.0 );
     var surface = { type:MirrorType.SPHERE, p:s, r2:4.0*R_squared, metric_signature:p3(1,1,sign(R_squared)) };
     var central_mirror = { type:MirrorType.POINT, p:o };
@@ -570,7 +570,7 @@ onto the Poincar&eacute; disk) and the sphere (projecting onto the stereographic
 <p>The edge points A and A' are projected onto the curved surface at B and B' using stereographic projection from point S.</p>
 <p>Points B and B', together with the center of the curved surface at O, define a plane which intersects the curved surface to give the geodesic - the shortest path across the curved surface between B and B' is shown in green. 
 For a sphere this is part of a great circle. For the hyperboloid it is part of a hyperbola.</b>
-<p>Reflecting B and B' in point O gives the antipodal points D and D' that lie on the same plane. When the curvature is negative they lie on the lower sheet of the hyperboloid.</p>
+<p>Reflecting B and B' in point O gives the antipodal points D and D' that lie on the same plane. When the curvature is negative they lie on the upper sheet of the hyperboloid.</p>
 <p>We project D and D' onto the plane at M and M'. We now have four points A, A', M, M' that define a circle. Arcs in this circle are straight lines in the stereographic plane.</p>
 <p>We can use circle inversion to mirror things across the edges. We reflect our central tile across each of its edges in this way.</p>
 
