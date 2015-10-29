@@ -122,15 +122,13 @@ function redraw() {
     point( a, 'A' );
 
     // define the origin
-    var o = p3(0,R,0);
+    var o = p3( 0, Math.abs(R), 0 );
     point( o, 'O' );
-    // construct the inversion that we use to project stereographically to and from the plane
-    var SR = 2.0 * R;
-    var SR2 = 4.0 * R2;
-    var s = p3( 0, SR, 0 );
-    var inversion = { type:MirrorType.SPHERE, p:s, r2:SR2, metric_signature:p3(1,sign(R),0) };
-    //circle( s, SR ); // is only a circle if the radius is real
+    // define the center of stereographic projection
+    var s = p3( 0, 2*Math.abs(R), 0 );
     point( s, 'S' );
+    // construct the inversion that we use to project stereographically to and from the plane
+    var inversion = { type:MirrorType.SPHERE, p:s, r2:4*R2, metric_signature:p3(1,sign(R),0) };
 
     if( R > 0 ) {
         ctx.fillStyle = homeFillStyle;
@@ -293,4 +291,3 @@ of curvature the tiles all line up and we get a regular tiling of the hyperbolic
 version of this <a href="projection_2D.html">here</a>.</p>
 
 </html>
-
