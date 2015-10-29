@@ -91,13 +91,14 @@ function reflect( p, mirror ) {
 var theta;
 var view_height;
 var camera;
-var sliders;
-var iActiveSlider;
 var curvatureRange = 1.99;
+var lastMousePos = null;
 var isSpinning = true;
+var rect_minus = { x: 10, y:10, width:20, height:20 };
+var rect_plus = { x: 50, y:10, width:20, height:20 };
+var N_SIDES = 3;
 
-function curvatureFromSliderPos( v ) { return ( v - 1 ) * curvatureRange; }
-function sliderPosFromCurvature( f ) { return f / curvatureRange + 1; }
+function curvatureFromMousePos( mousePos ) { return ( mousePos.x / canvas.width - 1 ) * curvatureRange; }
 
 function getMousePos(canvas, evt) {
     var rect = canvas.getBoundingClientRect();
@@ -105,30 +106,23 @@ function getMousePos(canvas, evt) {
 }
 
 function onMouseMove( evt ) {
-    var pos = getMousePos( canvas, evt );
-    if( iActiveSlider >= 0 ) {
-        var slider = sliders[ iActiveSlider ];
-        slider.value = Math.min( 1, Math.max( 0, ( pos.x - slider.x ) / slider.width ) );
-    }
-    //view_height = ( canvas.height / 2.0 - pos.y ) / canvas.height;
-    repositionCamera();
+    lastMousePos = getMousePos( canvas, evt );
 }
 
 function onMouseDown( evt ) {
-    var pos = getMousePos( canvas, evt );
-    for( var iSlider = 0; iSlider < sliders.length; ++iSlider ) {
-        if( pointInRect( pos, sliders[ iSlider ].handle_rect ) ) {
-            iActiveSlider = iSlider;
-            return;
-        }
+    lastMousePos = getMousePos( canvas, evt );
+    if( pointInRect( lastMousePos, rect_minus ) && N_SIDES > 3 ) {
+        N_SIDES--;
+        redraw();
     }
-    isSpinning = !isSpinning;
-    if( isSpinning ) animate();
-}
-
-function onMouseUp( evt ) {
-    iActiveSlider = -1;
-    redraw();
+    else if( pointInRect( lastMousePos, rect_plus ) && N_SIDES < 15 ) {
+        N_SIDES++;
+        redraw();
+    }
+    else {
+        isSpinning = !isSpinning;
+        if( isSpinning ) animate();
+    }
 }
 
 function repositionCamera() {
@@ -162,10 +156,6 @@ function init() {
     canvas = document.getElementById('canvas');
     ctx = canvas.getContext('2d');
 
-    sliders = [];
-    sliders[0] = { x: 300, y:10, width:canvas.width-600, height:20, value:sliderPosFromCurvature(-0.398), handle_rect:{} };
-    isActiveSlider = -1;
-    
     theta = Math.PI / 2;
     view_height = 0.5;
     camera = { p:p3(0,3,-6),
@@ -183,9 +173,6 @@ function init() {
     canvas.addEventListener( 'touchmove', onMouseMove, false );
     canvas.addEventListener( 'touchstart', onMouseDown, false );
     canvas.addEventListener( 'mousedown',  onMouseDown, false );
-    canvas.addEventListener( 'touchend', onMouseUp, false );
-    canvas.addEventListener( 'mouseup',  onMouseUp, false );
-    canvas.addEventListener( 'mouseout',  onMouseUp, false );
     
     animate();
 }
@@ -229,10 +216,13 @@ function point( p, t ) {
 
 function drawMesh() {
 
-    var NS = 3;
-    var depth = 9 - NS;
+    var depth = Math.max( 2, 9 - N_SIDES );
 
-    var f = curvatureFromSliderPos( sliders[ 0 ].value );
+    var f = null;
+    if( lastMousePos )
+        f = curvatureFromMousePos( lastMousePos );
+    else
+        f = -1;
 
     var R_real = null;
     var r_poincare = null;
@@ -253,8 +243,8 @@ function drawMesh() {
     
     // define our base polygon
     var polygon = [];
-    for( var i = 0; i < NS; ++i ) {
-        polygon.push( p3( R_polygon * Math.cos( i * 2.0 * Math.PI / NS ), R_polygon * Math.sin( i * 2.0 * Math.PI / NS, 0 ), 0 ) );
+    for( var i = 0; i < N_SIDES; ++i ) {
+        polygon.push( p3( R_polygon * Math.cos( i * 2.0 * Math.PI / N_SIDES ), R_polygon * Math.sin( i * 2.0 * Math.PI / N_SIDES, 0 ), 0 ) );
     }
     
     var R_squared = sign( R_real ) * R_real * R_real;
@@ -278,7 +268,7 @@ function drawMesh() {
     var IC0_r = null;
     var L = polygon[2];
     var P = null;
-    if( NS > 3 )
+    if( N_SIDES > 3 )
         P = polygon[3];
     var M = null;
     var M2 = null;
@@ -333,7 +323,7 @@ function drawMesh() {
         if( iVert == 0 ) {
             IC0 = { type:MirrorType.SPHERE, p:ic.p, r2:ic.r2, metric_signature:p3(1,1,1) };
             E = reflect( L, ic );
-            if( NS > 3 )
+            if( N_SIDES > 3 )
                 F = reflect( P, ic );
         }
         for( var i = 0; i <= npc; ++i )
@@ -348,12 +338,12 @@ function drawMesh() {
                 icps.push( reflect( icp[ i ], surface ) );
             lines.push( icps );
         }
-        if(iVert==1 && NS > 4) {
+        if(iVert==1 && N_SIDES > 4) {
             M = reflect( polygon[3], ic );
             M2 = reflect( polygon[4], ic );
         }
     }
-    if( NS > 4 ) {
+    if( N_SIDES > 4 ) {
         N = reflect( M, IC0 );
         N2 = reflect( M2, IC0 );
         G = lineWithLineIntersection2D( mul( add( F, E ), 0.5 ), perp2D( sub( F, E ) ), mul( add( N, E ), 0.5 ), perp2D( sub( N, E ) ) ).p;
@@ -546,13 +536,13 @@ function drawMesh() {
         point( camera_projection( A2, camera ), 'A\'' );
         
         point( camera_projection( E, camera ), 'E' );
-        if( NS > 3 ) {
+        if( N_SIDES > 3 ) {
             point( camera_projection( F, camera ), 'F' );
             point( camera_projection( P, camera ), 'P' );
         }
         point( camera_projection( L, camera ), 'L' );
         point( camera_projection( IC0.p, camera ), 'IC0.p' );
-        if( NS > 4 ) {
+        if( N_SIDES > 4 ) {
             point( camera_projection( M, camera ), 'M' );
             point( camera_projection( M2, camera ), 'M2' );
             point( camera_projection( N, camera ), 'N' );
@@ -563,22 +553,24 @@ function drawMesh() {
         }
     }
     
-    // Log things for making a rangoli
-    console.log( 'Radius of the base circle: '+Math.abs(2.0 * r_poincare).toString());
-    console.log( 'Distance of the base polygon vertices: '+dist(A,p3(0,0,0)).toString());
-    console.log( 'Edge length of the base polygon: '+dist(A,A2).toString());
-    console.log( 'Radius of the first inversion circle: '+Math.sqrt(IC0.r2).toString());
-    console.log( 'Distance of the center of the first inversion circle: '+dist(IC0.p,p3(0,0,0)).toString());
-    console.log( 'Distance CE: '+dist(E,p3(0,0,0)).toString());
-    if( NS > 3 ) {
-        console.log( 'Distance CF: '+dist(F,p3(0,0,0)).toString());
-    }
-    if( NS > 4 ) {
-        console.log( 'Distance CG: '+dist(G,p3(0,0,0)).toString());
-        console.log( 'Distance FG: '+dist(G,F).toString());
-        console.log( 'Distance CN: '+dist(N,p3(0,0,0)).toString());
-        console.log( 'Distance CQ: '+dist(IC2.p,p3(0,0,0)).toString());
-        console.log( 'Distance QN: '+dist(IC2.p,N).toString());
+    if( false ) {
+        // Log things for making a rangoli
+        console.log( 'Radius of the base circle: '+Math.abs(2.0 * r_poincare).toString());
+        console.log( 'Distance of the base polygon vertices: '+dist(A,p3(0,0,0)).toString());
+        console.log( 'Edge length of the base polygon: '+dist(A,A2).toString());
+        console.log( 'Radius of the first inversion circle: '+Math.sqrt(IC0.r2).toString());
+        console.log( 'Distance of the center of the first inversion circle: '+dist(IC0.p,p3(0,0,0)).toString());
+        console.log( 'Distance CE: '+dist(E,p3(0,0,0)).toString());
+        if( N_SIDES > 3 ) {
+            console.log( 'Distance CF: '+dist(F,p3(0,0,0)).toString());
+        }
+        if( N_SIDES > 4 ) {
+            console.log( 'Distance CG: '+dist(G,p3(0,0,0)).toString());
+            console.log( 'Distance FG: '+dist(G,F).toString());
+            console.log( 'Distance CN: '+dist(N,p3(0,0,0)).toString());
+            console.log( 'Distance CQ: '+dist(IC2.p,p3(0,0,0)).toString());
+            console.log( 'Distance QN: '+dist(IC2.p,N).toString());
+        }
     }
 }
 
@@ -594,18 +586,19 @@ function sign( x ) {
 }
 
 function drawUI() {
-    // draw the sliders
+    // draw the +/- buttons
+    ctx.fillStyle="rgb(255,255,255)";
     ctx.strokeStyle="rgb(0,0,0)";
-    for( var iSlider = 0; iSlider < sliders.length; ++iSlider ) {
-        var slider = sliders[ iSlider ];
-        ctx.fillStyle="rgb(255,255,255)";
-        drawRect( slider.x, slider.y + slider.height/3, slider.width, slider.height/3 ); // rail
-        if( iActiveSlider == iSlider )
-            ctx.fillStyle="rgb(100,100,255)";
-        var handle_radius = 5;
-        slider.handle_rect = { x:slider.x+slider.width*slider.value-handle_radius, y:slider.y, width:handle_radius*2+1, height:slider.height };
-        drawRect( slider.handle_rect.x, slider.handle_rect.y, slider.handle_rect.width, slider.handle_rect.height );
-    }
+    ctx.fillRect( rect_minus.x, rect_minus.y, rect_minus.width, rect_minus.height );
+    ctx.strokeRect( rect_minus.x, rect_minus.y, rect_minus.width, rect_minus.height );
+    ctx.fillRect( rect_plus.x, rect_plus.y, rect_plus.width, rect_plus.height );
+    ctx.strokeRect( rect_plus.x, rect_plus.y, rect_plus.width, rect_plus.height );
+    ctx.font="18px Arial";
+    ctx.fillStyle="rgb(0,0,0)";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("-",rect_minus.x+rect_minus.width/2,rect_minus.y + rect_minus.height/2 );
+    ctx.fillText("+",rect_plus.x+rect_plus.width/2,rect_plus.y + rect_plus.height/2 );
 }
 
 function animate() {
@@ -631,7 +624,7 @@ instructions how to enable JavaScript in your web browser</a>.
 
 <body>
 
-<p><b>Controls:</b> Use the slider to change the curvature.</p>
+<p><b>Controls:</b> Move the mouse left and right to change the size of the central polygon. Use the + and - buttons to change the number of sides.</p>
 
 <p align="center"><canvas id="canvas" width="1000" height="600">(Canvas drawing not supported by your browser.)</canvas></p>
 
