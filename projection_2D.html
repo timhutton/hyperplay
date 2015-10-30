@@ -75,6 +75,8 @@ var sliders;
 var iActiveSlider;
 var curvatureRange = 2;
 var isSpinning = true;
+var scaleToEdge = true;
+var toggle_scale_button = { x: 10, y:10, width:200, height:20 };
 
 function curvatureFromSliderPos( v ) { return ( v - 0.5 ) * curvatureRange; }
 function sliderPosFromCurvature( f ) { return f / curvatureRange + 0.5; }
@@ -96,6 +98,11 @@ function onMouseMove( evt ) {
 
 function onMouseDown( evt ) {
     var pos = getMousePos( canvas, evt );
+    if( pointInRect( pos, toggle_scale_button ) ) {
+        scaleToEdge = !scaleToEdge;
+        redraw();
+        return;
+    }
     for( var iSlider = 0; iSlider < sliders.length; ++iSlider ) {
         if( pointInRect( pos, sliders[ iSlider ].handle_rect ) ) {
             iActiveSlider = iSlider;
@@ -133,7 +140,7 @@ function init() {
     ctx = canvas.getContext('2d');
 
     sliders = [];
-    sliders[0] = { x: 10, y:10, width:canvas.width-20, height:20, value:sliderPosFromCurvature(0.3), handle_rect:{} };
+    sliders[0] = { x: 300, y:10, width:canvas.width-400, height:20, value:sliderPosFromCurvature(0.3), handle_rect:{} };
     isActiveSlider = -1;
     
     theta = Math.PI / 2;
@@ -201,6 +208,24 @@ function drawMesh() {
 
     var depth = 1;
 
+    var f = curvatureFromSliderPos( sliders[ 0 ].value );
+    var R_real;
+    var R_poincare;
+    var R_polygon;
+    if( scaleToEdge ) {
+        // keep the polygon fixed and determine the poincare disk size from the curvature
+        R_real = 2.0 / f;
+        if( Math.abs( f ) < 1e-6 ) R_real = 1.0 / 1e-6;
+        R_poincare = 2.0 * R_real;
+        R_polygon = 2;
+    }
+    else {
+        // keep the poincare disk size fixed and determine the size of the polygon from the curvature
+        R_real = sign(f) * 3.0;
+        R_poincare = 2.0 * R_real;
+        R_polygon = f * R_real;
+    }
+
     var faces = [];
     var special_lines = [];
     var lines = [];
@@ -209,18 +234,15 @@ function drawMesh() {
     // define our base polygon
     var polygon = [];
     var N = 4;
-    var R_polygon = 2;
     for( var i = 0; i < N; ++i ) {
         polygon.push( p3( R_polygon * Math.cos( i * 2.0 * Math.PI / N ), R_polygon * Math.sin( i * 2.0 * Math.PI / N, 0 ), 0 ) );
     }
     // define the main sphere inversion that takes us between the curved surface and the stereographic plane
-    var f = curvatureFromSliderPos( sliders[ 0 ].value );
-    var R_real = 1.0 / f;
-    if( Math.abs( f ) < 1e-6 ) R_real = 1.0 / 1e-6;
     var R_squared = sign( R_real ) * R_real * R_real;
     var o = p3( 0, 0, Math.abs( R_real ) );
     var s = mul( o, 2.0 );
     var surface = { type:MirrorType.SPHERE, p:s, r2:4.0*R_squared, metric_signature:p3(1,1,sign(R_squared)) };
+    var surfaceH = { type:MirrorType.SPHERE, p:s, r2:Math.abs(4.0*R_squared), metric_signature:p3(-1,-1,1) };
     var central_mirror = { type:MirrorType.POINT, p:o };
 
     var A = polygon[ 0 ];
@@ -337,7 +359,8 @@ function drawMesh() {
         }
     }
     // show the curved surface itself
-    if( R_squared > 0 ) {
+    //if( R_squared > 0 ) 
+    {
         // lines of longitude
         var nTheta = 100;
         var nPhi = 10;
@@ -367,7 +390,8 @@ function drawMesh() {
             construction_lines.push( gc );
         }
     }
-    else {
+    //else 
+    {
         // lines of latitude
         var nTheta = 100;
         var nR = 10;
@@ -377,7 +401,7 @@ function drawMesh() {
             for( var iTheta = 0; iTheta <= nTheta; ++iTheta ) {
                 var theta = iTheta * 2.0 * Math.PI / nTheta;
                 var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
-                p = reflect( p, surface );
+                p = reflect( p, surfaceH );
                 cl.push( p );
             }
             construction_lines.push( cl );
@@ -390,7 +414,7 @@ function drawMesh() {
             for( var iR = 0; iR < nR; ++iR ) {
                 var r = iR * 2.0 * R_real / nR;
                 var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
-                p = reflect( p, surface );
+                p = reflect( p, surfaceH );
                 cl.push( p );
             }
             construction_lines.push( cl );
@@ -404,7 +428,7 @@ function drawMesh() {
             for( var iTheta = 0; iTheta <= nTheta; ++iTheta ) {
                 var theta = iTheta * 2.0 * Math.PI / nTheta;
                 var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
-                p = reflect( p, surface );
+                p = reflect( p, surfaceH );
                 cl.push( p );
             }
             construction_lines.push( cl );
@@ -417,17 +441,16 @@ function drawMesh() {
             for( var iR = 1; iR < nR; ++iR ) {
                 var r = 2.0 * R_real + Math.pow( 1.5, iR ) * R_real * 10.0 / nR;
                 var p = p3( r * Math.cos( theta ), r * Math.sin( theta ), 0 );
-                p = reflect( p, surface );
+                p = reflect( p, surfaceH );
                 cl.push( p );
             }
             construction_lines.push( cl );
         }
         // draw the boundary of the Poincare disk
         var pd = [];
-        var r = 2.0 * R_real;
         var nppd = 40;
         for( var i = 0; i <= nppd; ++i )
-            pd.push( p3( r*Math.cos( i * 2.0 * Math.PI / nppd ), r*Math.sin( i * 2.0 * Math.PI / nppd ), 0 ) );
+            pd.push( p3( R_poincare*Math.cos( i * 2.0 * Math.PI / nppd ), R_poincare*Math.sin( i * 2.0 * Math.PI / nppd ), 0 ) );
         pd.push( pd[0] );
         lines.push( pd );
     }
@@ -536,6 +559,16 @@ function drawUI() {
         slider.handle_rect = { x:slider.x+slider.width*slider.value-handle_radius, y:slider.y, width:handle_radius*2+1, height:slider.height };
         drawRect( slider.handle_rect.x, slider.handle_rect.y, slider.handle_rect.width, slider.handle_rect.height );
     }
+    // draw the toggle scale button
+    ctx.fillStyle="rgb(255,255,255)";
+    ctx.strokeStyle="rgb(0,0,0)";
+    ctx.fillRect( toggle_scale_button.x, toggle_scale_button.y, toggle_scale_button.width, toggle_scale_button.height );
+    ctx.strokeRect( toggle_scale_button.x, toggle_scale_button.y, toggle_scale_button.width, toggle_scale_button.height );
+    ctx.font="12px Arial";
+    ctx.fillStyle="rgb(0,0,0)";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText( scaleToEdge?"scale is from edge length":"scale is fixed",toggle_scale_button.x+toggle_scale_button.width/2,toggle_scale_button.y + toggle_scale_button.height/2 );
 }
 
 function animate() {
@@ -573,8 +606,6 @@ For a sphere this is part of a great circle. For the hyperboloid it is part of a
 <p>Reflecting B and B' in point O gives the antipodal points D and D' that lie on the same plane. When the curvature is negative they lie on the upper sheet of the hyperboloid.</p>
 <p>We project D and D' onto the plane at M and M'. We now have four points A, A', M, M' that define a circle. Arcs in this circle are straight lines in the stereographic plane.</p>
 <p>We can use circle inversion to mirror things across the edges. We reflect our central tile across each of its edges in this way.</p>
-
-<p>There's a version of this with a fixed size, <a href="projection_2D_fixed_radius.html">here<a/>. 
 
 <p>To see the construction more clearly, there's a 1D version <a href="projection_and_mirroring.html">here</a>. To understand why negative curvature leads us to a hyperboloid, 
 there's an explanation <a href="generalized_stereographic_projection.html">here</a>. For exploring the many tilings of the sphere and hyperbolic plane, including hyperbolic space tessellations,
