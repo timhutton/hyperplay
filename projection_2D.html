@@ -291,8 +291,6 @@ function drawMesh() {
             geodesic_segment_projected_mirrored.push( p_curved_projected_mirrored );
             geodesic_segment_mirrored.push( p_curved_mirrored );
         }
-        construction_lines.push( [ a, s, ap ] );
-        construction_lines.push( [ b, s, bp ] );
         if( iVert == 0 ) {
             special_lines.push( geodesic_segment );
             special_lines.push( geodesic_segment_projected );
@@ -333,7 +331,8 @@ function drawMesh() {
         // also add construction lines for the base polygon
         for( var iVert = 0; iVert < polygon.length; ++iVert ) {
             var p = reflect( polygon[ iVert ], mirrors[ iMirror ] );
-            construction_lines.push( [ p, s ] );
+            var pp = reflect( p, surface );
+            construction_lines.push( [ p, s, pp ] );
         }
         // then reflect those faces in the mirrors again
         if( depth > 1 ) {
@@ -353,7 +352,8 @@ function drawMesh() {
                 for( var iVert = 0; iVert < polygon.length; ++iVert ) {
                     var p = reflect( polygon[ iVert ], mirrors[ iMirror ] );
                     p = reflect( p, mirrors[ iMirror2 ] );
-                    construction_lines.push( [ p, s ] );
+                    var pp = reflect( p, surface );
+                    construction_lines.push( [ p, s, pp ] );
                 }
             }
         }
