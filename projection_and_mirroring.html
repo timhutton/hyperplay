@@ -68,10 +68,6 @@ function onTouchMove( evt ) {
     redraw();
 }
 
-function onTouchStart( evt ) {
-    evt.preventDefault();
-}
-
 function init() {
     canvas = document.getElementById('canvas');
     ctx = canvas.getContext('2d');
@@ -83,7 +79,6 @@ function init() {
 
     canvas.addEventListener( 'mousemove', onMouseMove, false );
     canvas.addEventListener( 'touchmove', onTouchMove, false );
-    canvas.addEventListener( 'touchstart', onTouchStart, false );
 }
 
 function moveTo( a ) { ctx.moveTo( a.x*scale + translate.x, translate.y - a.y*scale ); }
