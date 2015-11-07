@@ -79,20 +79,36 @@ function changeNumberOfSides( newN ) {
     redraw();
 }
 
-function getMousePos(canvas, evt) {
-    var rect = canvas.getBoundingClientRect();
-    return p2( evt.clientX - rect.left, evt.clientY - rect.top );
+function onMouseMove( evt ) {
+    changeCurvature( evt.clientX );
 }
 
-function onMouseMove( evt ) {
-    var pos = getMousePos( canvas, evt );
-    f = ( pos.x - canvas.width / 2 ) / ( canvas.width / 3 );
+function onTouchMove( evt ) {
+    changeCurvature( evt.changedTouches[0].clientX );
+}
+
+function changeCurvature( clientX ) {
+    var rect = canvas.getBoundingClientRect();
+    f = ( clientX - rect.left - canvas.width / 2 ) / ( canvas.width / 3 );
     make_spec();
     redraw();
 }
 
+function clientToCanvas( clientPos ) {
+    var rect = canvas.getBoundingClientRect();
+    return p2( clientPos.x - rect.left, clientPos.y - rect.top );
+}
+
+function onTouchStart( evt ) {
+    var touch = evt.changedTouches[0];
+    testClick( clientToCanvas( p2( touch.clientX, touch.clientY ) ) );
+}
+
 function onMouseDown( evt ) {
-    var pos = getMousePos( canvas, evt );
+    testClick( clientToCanvas( p2( evt.clientX, evt.clientY ) ) );
+}
+    
+function testClick( pos ) {    
     if( N > 3 && pointInRect( pos, rect_minus ) ) {
         changeNumberOfSides( N-1 );
     }
@@ -141,10 +157,10 @@ function init() {
     redraw();
 
     canvas.addEventListener( 'mousemove',   onMouseMove, false );
-    canvas.addEventListener( 'touchmove',   onMouseMove, false );
+    canvas.addEventListener( 'touchmove',   onTouchMove, false );
 
-    canvas.addEventListener( 'touchstart',  onMouseDown, false );
     canvas.addEventListener( 'mousedown',   onMouseDown, false );
+    canvas.addEventListener( 'touchstart',  onTouchStart, false );
 
     animate();
 }
