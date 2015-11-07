@@ -61,6 +61,7 @@ function onMouseMove( evt ) {
 }
 
 function onTouchMove( evt ) {
+    evt.preventDefault();
     var touch = evt.changedTouches[0];
     var pos = clientToCanvas( canvas, p2( touch.clientX, touch.clientY ) );
     f = ( pos.x - canvas.width/2 ) * 0.5;
