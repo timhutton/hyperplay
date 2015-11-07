@@ -93,24 +93,38 @@ var view_height;
 var camera;
 var curvatureRange = 1.99;
 var lastMousePos = null;
-var isSpinning = true;
 var rect_minus = { x: 10, y:10, width:20, height:20 };
 var rect_plus = { x: 50, y:10, width:20, height:20 };
 var N_SIDES = 3;
 
 function curvatureFromMousePos( mousePos ) { return ( mousePos.x / canvas.width - 1 ) * curvatureRange; }
 
-function getMousePos(canvas, evt) {
+function clientToCanvas( clientPos ) {
     var rect = canvas.getBoundingClientRect();
-    return p2( evt.clientX - rect.left, evt.clientY - rect.top );
+    return p2( clientPos.x - rect.left, clientPos.y - rect.top );
+}
+
+function onTouchMove( evt ) {
+    var touch = evt.changedTouches[0];
+    lastMousePos = clientToCanvas( p2( touch.clientX, touch.clientY ) );
 }
 
 function onMouseMove( evt ) {
-    lastMousePos = getMousePos( canvas, evt );
+    lastMousePos = clientToCanvas( p2( evt.clientX, evt.clientY ) );
 }
 
 function onMouseDown( evt ) {
-    lastMousePos = getMousePos( canvas, evt );
+    lastMousePos = clientToCanvas( p2( evt.clientX, evt.clientY ) );
+    testClick();
+}
+
+function onTouchStart( evt ) {
+    var touch = evt.changedTouches[0];
+    lastMousePos = clientToCanvas( p2( touch.clientX, touch.clientY ) );
+    testClick();
+}
+
+function testClick() {
     if( pointInRect( lastMousePos, rect_minus ) && N_SIDES > 3 ) {
         N_SIDES--;
         redraw();
@@ -119,34 +133,15 @@ function onMouseDown( evt ) {
         N_SIDES++;
         redraw();
     }
-    else {
-        isSpinning = !isSpinning;
-        if( isSpinning ) animate();
-    }
 }
 
 function repositionCamera() {
-    if( false ) {
-        // 3D view
-        var look_at = p3(0,0,0);
-        var d = 15;
-        var vd = d * view_height;
-        var hd = Math.sqrt( d*d - vd*vd );
-        camera.p = p3( hd*Math.cos(theta), hd*Math.sin(theta), vd  );
-        camera.z = normalize( sub( look_at, camera.p ) );
-        var up = p3(0,0,1);
-        camera.x = normalize( cross( camera.z, up ) );
-        camera.y = normalize( cross( camera.x, camera.z ) );
-    }
-    else {
-        // 2D view
-        camera.p = p3(0,0,-5);
-        camera.x = p3(1,0,0);
-        camera.y = p3(0,1,0);
-        camera.z = p3(0,0,1);
-    }
+    camera.p = p3(0,0,-5);
+    camera.x = p3(1,0,0);
+    camera.y = p3(0,1,0);
+    camera.z = p3(0,0,1);
 }
-
+    
 function pointInRect( p, rect ) {
     return p.x > rect.x && p.x < ( rect.x + rect.width ) &&
            p.y > rect.y && p.y < ( rect.y + rect.height );
@@ -170,9 +165,10 @@ function init() {
     redraw();
 
     canvas.addEventListener( 'mousemove', onMouseMove, false );
-    canvas.addEventListener( 'touchmove', onMouseMove, false );
-    canvas.addEventListener( 'touchstart', onMouseDown, false );
+    canvas.addEventListener( 'touchmove', onTouchMove, false );
+    
     canvas.addEventListener( 'mousedown',  onMouseDown, false );
+    canvas.addEventListener( 'touchstart', onTouchStart, false );
     
     animate();
 }
@@ -608,11 +604,6 @@ function drawUI() {
 }
 
 function animate() {
-    if( isSpinning ) {
-        // rotate round
-        theta += 0.005;
-        repositionCamera();
-    }
     redraw();
     requestAnimationFrame( animate );
 }
