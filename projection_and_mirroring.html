@@ -49,23 +49,19 @@ var f;
 var scale;
 var translate;
 
-function clientToCanvas(canvas, p) {
+function changeCurvature( clientX ) {
     var rect = canvas.getBoundingClientRect();
-    return p2( p.x - rect.left, p.y - rect.top );
+    f = ( clientX - rect.left - canvas.width/2 ) * 0.5;
+    redraw();
 }
 
 function onMouseMove( evt ) {
-    var pos = clientToCanvas( canvas, p2( evt.clientX, evt.clientY ) );
-    f = ( pos.x - canvas.width/2 ) * 0.5;
-    redraw();
+    changeCurvature( evt.clientX );
 }
 
 function onTouchMove( evt ) {
     evt.preventDefault();
-    var touch = evt.changedTouches[0];
-    var pos = clientToCanvas( canvas, p2( touch.clientX, touch.clientY ) );
-    f = ( pos.x - canvas.width/2 ) * 0.5;
-    redraw();
+    changeCurvature( evt.changedTouches[0].clientX );
 }
 
 function init() {
