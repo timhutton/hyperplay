@@ -100,6 +100,7 @@ function clientToCanvas( clientPos ) {
 }
 
 function onTouchStart( evt ) {
+    evt.preventDefault();
     var touch = evt.changedTouches[0];
     testClick( clientToCanvas( p2( touch.clientX, touch.clientY ) ) );
 }
