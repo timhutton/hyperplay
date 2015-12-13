@@ -111,11 +111,11 @@ function onMouseDown( evt ) {
 }
     
 function testClick( pos, fromTouch ) {    
-    if( N > 3 && pointInRect( pos, rect_minus ) ) {
-        changeNumberOfSides( N-1 );
+    if( pointInRect( pos, rect_minus ) ) {
+        if( N > 3 ) changeNumberOfSides( N-1 );
     }
-    else if( N < 15 && pointInRect( pos, rect_plus ) ) {
-        changeNumberOfSides( N+1 );
+    else if( pointInRect( pos, rect_plus ) ) {
+        if ( N < 15 ) changeNumberOfSides( N+1 );
     }
     else if( !fromTouch ) {
         isSpinning = !isSpinning;
